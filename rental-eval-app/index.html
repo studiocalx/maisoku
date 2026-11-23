@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111214" />
+  <title>studioCALX 賃貸物件評価システム v2（賃貸物件スピード査定AI）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base: #F3F3EF;
+      --surface: #FFFFFF;
+      --ink: #111214;
+      --muted: #5A5D65;
+      --volt: #E6FF00;
+      --line: #DCDCD6;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--ink);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .volt-btn {
+      background-color: var(--volt);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      box-shadow: 0 3px 0 var(--ink);
+      transition: transform 0.1s ease, background-color 0.15s ease;
+    }
+    .volt-btn:hover {
+      background-color: #D6EE00;
+    }
+    .volt-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+
+    @keyframes scanSweep {
+      0% { top: 6%; opacity: 0.35; }
+      50% { top: 90%; opacity: 1; }
+      100% { top: 6%; opacity: 0.35; }
+    }
+    .scan-beam {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #E6FF00, #10B981, #E6FF00, transparent);
+      box-shadow: 0 0 14px #E6FF00;
+      animation: scanSweep 1.8s ease-in-out infinite;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- 通知トースト（alert不使用） -->
+  <div id="toastBox" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-[#111214] text-white border-l-4 border-[#E6FF00] px-4 py-3 rounded-xl shadow-2xl text-xs font-bold flex items-center justify-between gap-3">
+    <span id="toastMessage">メッセージ</span>
+    <button onclick="hideToast()" class="text-neutral-400 hover:text-white text-base leading-none font-black">&times;</button>
+  </div>
+
+  <!-- トップバー：ブランド・4桁コード同期・表示モード切替・Pixel8a案内 -->
+  <header class="sticky top-0 z-30 bg-[#111214] text-white border-b border-neutral-800 px-3 sm:px-5 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <!-- ブランド -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-[#E6FF00] text-[#111214] font-black text-xs flex items-center justify-center shrink-0">
+          SCX
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-black tracking-tight">賃貸物件スピード査定AI</span>
+            <span class="text-[10px] font-black bg-neutral-800 text-[#E6FF00] px-1.5 py-0.5 rounded">studioCALX v2</span>
+          </div>
+          <p class="text-[10px] text-neutral-400 hidden sm:block">スマホ撮影＆沿線判定 × PC商談比較 × 内見・契約チェック</p>
+        </div>
+      </div>
+
+      <!-- 4桁数字ルーム同期バー -->
+      <div class="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1">
+        <span class="text-[10px] font-bold text-neutral-400">同期4桁</span>
+        <input id="roomCodeInput" type="text" maxlength="4" inputmode="numeric" value="4829"
+          aria-label="4桁同期コード"
+          class="w-12 bg-neutral-800 text-[#E6FF00] font-black text-xs text-center rounded-md py-1 tracking-widest focus:outline-none focus:ring-1 focus:ring-[#E6FF00]" />
+        <button onclick="connectRoomCode()" class="bg-[#E6FF00] text-[#111214] text-[11px] font-black px-2 py-1 rounded-md hover:bg-[#D6EE00]">
+          接続
+        </button>
+        <button onclick="randomizeRoomCode()" title="4桁番号をランダム生成" class="bg-neutral-800 text-neutral-200 text-[11px] font-bold px-2 py-1 rounded-md hover:bg-neutral-700">
+          乱数
+        </button>
+        <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" title="4桁コード同期稼働中"></span>
+      </div>
+
+      <!-- 表示モード切替（スマホ / PC / 不動産屋提示モード）＆ Pixel 8a 導入ガイド -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <div class="inline-flex bg-neutral-900 border border-neutral-700 rounded-xl p-0.5 text-[11px] font-bold">
+          <button id="modeBtnMobile" onclick="setViewportMode('mobile')" class="px-2.5 py-1 rounded-lg bg-[#E6FF00] text-[#111214] font-black">
+            📱 スマホ撮影・現地
+          </button>
+          <button id="modeBtnPc" onclick="setViewportMode('pc')" class="px-2.5 py-1 rounded-lg text-neutral-300 hover:text-white">
+            💻 PC商談・比較
+          </button>
+        </div>
+        <button id="modeBtnPresent" onclick="togglePresenterMode()" class="px-2.5 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-[11px] font-bold text-neutral-200 hover:text-white">
+          自分用（詳細・メモ）
+        </button>
+        <button onclick="openPwaModal()" class="bg-neutral-800 hover:bg-neutral-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-xl border border-neutral-700">
+          Pixel 8a導入
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ワークフロー段階タブ（① 店頭・商談査定 / ② 内見チェック表 / ③ 契約時チェック） -->
+  <div class="bg-white border-b border-[#DCDCD6] px-3 sm:px-5 py-2">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="stepTab1" onclick="setWorkflowStep('eval')" class="px-3 py-1.5 rounded-xl text-xs font-black bg-[#111214] text-[#E6FF00]">
+          ① 店頭・商談査定
+        </button>
+        <button id="stepTab2" onclick="setWorkflowStep('viewing')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-700 hover:bg-neutral-200">
+          ② 内見チェック表
+        </button>
+        <button id="stepTab3" onclick="setWorkflowStep('contract')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-700 hover:bg-neutral-200">
+          ③ 契約時チェック
+        </button>
+      </div>
+      <div id="syncBannerInfo" class="text-[11px] font-bold text-neutral-500 shrink-0 hidden md:block">
+        Room #4829 同期中（タブ間即時同期＆ローカル保存）
+      </div>
+    </div>
+  </div>
+
+  <!-- メインコンテナ（スマホ枠 / PCワイド枠を動的切替） -->
+  <main id="mainContainer" class="flex-1 w-full max-w-[460px] mx-auto px-3 sm:px-5 py-4 transition-all duration-200">
+
+    <!-- =================================================================== -->
+    <!-- STEP 1: 店頭・商談査定（撮影 / 沿線判定 / スマート推察 / 項目編集）  -->
+    <!-- =================================================================== -->
+    <section id="stepSectionEval" class="space-y-4">
+
+      <!-- 3カラムグリッド（PCモード時は3列、スマホモード時は1列） -->
+      <div id="evalGrid" class="grid grid-cols-1 gap-4">
+
+        <!-- 【COLUMN 1】撮影・プリセット・物件スペック入力・沿線/種別/路線ハブ判定 -->
+        <div id="colInputAndMap" class="space-y-4">
+          <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-1.5">
+              <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">01 / マイソク撮影＆入力</span>
+              <div class="flex items-center gap-1.5">
+                <button onclick="loadShimizuSample()" class="text-[11px] font-black bg-[#111214] text-[#E6FF00] px-2.5 py-1 rounded-lg hover:bg-neutral-800">
+                  サンプル:清水駅3.3万
+                </button>
+                <button onclick="loadFuseSample()" class="text-[11px] font-bold bg-neutral-100 text-neutral-800 px-2 py-1 rounded-lg hover:bg-neutral-200 border border-[#DCDCD6]">
+                  サンプル:布施駅6.2万
+                </button>
+              </div>
+            </div>
+
+            <!-- カメラ・ファイル選択 -->
+            <input type="file" id="flyerCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFlyerImage(event)" />
+            <input type="file" id="flyerFileInput" accept="image/*" class="hidden" onchange="handleFlyerImage(event)" />
+
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="document.getElementById('flyerCameraInput').click()" class="volt-btn rounded-xl py-2.5 px-3 text-xs font-black flex items-center justify-center gap-1.5">
+                <span>店頭を撮影（カメラ）</span>
+              </button>
+              <button onclick="document.getElementById('flyerFileInput').click()" class="bg-neutral-100 hover:bg-neutral-200 border border-[#DCDCD6] rounded-xl py-2.5 px-3 text-xs font-bold text-[#111214] flex items-center justify-center gap-1.5">
+                <span>写真・チラシ読込</span>
+              </button>
+            </div>
+
+            <!-- 画像プレビュー＆スキャン演出 -->
+            <div id="imagePreviewBox" class="hidden relative rounded-xl overflow-hidden border border-[#DCDCD6] bg-neutral-900 aspect-[16/10] flex items-center justify-center">
+              <img id="previewImageEl" src="" alt="マイソク画像" class="max-h-full max-w-full object-contain" />
+              <div id="scanOverlay" class="hidden absolute inset-0 bg-black/65 flex flex-col items-center justify-center text-white p-3 text-center">
+                <div class="scan-beam"></div>
+                <div class="w-8 h-8 border-3 border-[#E6FF00] border-t-transparent rounded-full animate-spin mb-2"></div>
+                <p class="text-xs font-black text-[#E6FF00]">マイソク＆沿線条件を解析中...</p>
+              </div>
+              <button onclick="clearFlyerImage()" class="absolute top-2 right-2 bg-black/75 text-white text-[10px] font-bold px-2 py-1 rounded-md">
+                画像クリア
+              </button>
+            </div>
+
+            <!-- 物件スペック編集フォーム（撮影後の補正・手入力用） -->
+            <div class="pt-2 border-t border-neutral-100 grid grid-cols-2 gap-2 text-xs">
+              <div class="col-span-2">
+                <label class="block text-[10px] font-bold text-neutral-500">物件名・所在地メモ</label>
+                <input id="inpPropertyTitle" type="text" oninput="runFullEvaluation()"
+                  class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 font-bold text-[#111214]" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">賃料＋管理費（万円）</label>
+                <input id="inpTotalRentMan" type="number" step="0.1" oninput="runFullEvaluation()"
+                  class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 font-black text-[#111214]" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">駅徒歩（分） / 築年数</label>
+                <div class="flex gap-1 mt-0.5">
+                  <input id="inpWalkMin" type="number" min="1" max="60" oninput="runFullEvaluation()" title="徒歩分"
+                    class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
+                  <input id="inpBuildAge" type="number" min="0" max="80" oninput="runFullEvaluation()" title="築年数"
+                    class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">階数 / 建物階建</label>
+                <div class="flex gap-1 mt-0.5">
+                  <input id="inpFloorNum" type="number" min="1" max="60" oninput="runFullEvaluation()" placeholder="階"
+                    class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
+                  <input id="inpMaxFloor" type="number" min="1" max="60" oninput="runFullEvaluation()" placeholder="階建"
+                    class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">間取り / 面積(㎡)</label>
+                <div class="flex gap-1 mt-0.5">
+                  <input id="inpLayout" type="text" oninput="runFullEvaluation()"
+                    class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
+                  <input id="inpAreaSqm" type="number" step="0.5" oninput="runFullEvaluation()"
+                    class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 絶対条件・基本設備トグル（必須6項目） -->
+            <div class="pt-2 border-t border-neutral-100 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-neutral-500">建物・設備の基本条件（タップで切替）</span>
+                <span id="mustHaveSummaryBadge" class="text-[10px] font-black px-2 py-0.5 rounded bg-neutral-100 text-neutral-700">6項目確認</span>
+              </div>
+              <div id="mustHaveChipsContainer" class="flex flex-wrap gap-1.5">
+                <!-- JSで必須6項目チップ描画 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 沿線・停車種別・複数路線ハブ識別カード -->
+          <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">02 / 沿線・種別・路線ハブ識別</span>
+              <span id="railScoreBadge" class="text-xs font-black bg-[#111214] text-[#E6FF00] px-2 py-0.5 rounded">路線点: --</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">最寄駅・沿線</label>
+                <input id="inpStationLine" type="text" oninput="runFullEvaluation()"
+                  class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 font-bold" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">停車種別</label>
+                <select id="selStopType" onchange="runFullEvaluation()"
+                  class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold">
+                  <option value="local">普通（各駅停車のみ）</option>
+                  <option value="semi_express">準急・区間急行・快速系</option>
+                  <option value="express">急行・特急・新快速系</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">複数路線・結節点（ハブ性）</label>
+                <select id="selHubType" onchange="runFullEvaluation()"
+                  class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold">
+                  <option value="single">単一路線のみ</option>
+                  <option value="nearby">徒歩/自転車圏に別路線あり</option>
+                  <option value="multi_hub">2路線以上が交差（乗換・ハブ駅）</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-neutral-500">沿線風情・地形（平地/商業）</label>
+                <select id="selCorridorVibe" onchange="runFullEvaluation()"
+                  class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold">
+                  <option value="shitamachi_flat">下町・商店街・平地◎</option>
+                  <option value="urban_mixed">市街地・利便性○</option>
+                  <option value="hill_quiet">坂道・郊外/静穏△</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="railAnalysisSummary" class="bg-[#F8F8F6] rounded-xl p-2.5 text-xs text-neutral-700 font-medium leading-relaxed border border-neutral-200">
+              <!-- JSで沿線分析を表示 -->
+            </div>
+          </div>
+
+          <!-- ミニ地図（同心円距離リング＆生活圏ピン＋外部地図リンク） -->
+          <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">03 / 駅・生活圏ピンマップ</span>
+              <a id="externalMapLink" href="https://www.google.com/maps/search/?api=1&query=清水駅+大阪府大阪市旭区" target="_blank" rel="noopener noreferrer"
+                class="text-[11px] font-black underline text-[#111214] hover:text-neutral-600">
+                Googleマップで周辺確認 ↗
+              </a>
+            </div>
+            <div class="relative rounded-xl border border-[#DCDCD6] bg-[#EEF2EA] h-48 overflow-hidden p-3 flex flex-col justify-between">
+              <!-- 徒歩5分・自転車10分圏の同心円リング -->
+              <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 320 190" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <pattern id="mapGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+                    <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#94a3b8" stroke-width="0.6" opacity="0.35" />
+                  </pattern>
+                </defs>
+                <rect width="320" height="190" fill="url(#mapGrid)" />
+                <circle cx="160" cy="95" r="78" fill="none" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" opacity="0.45" />
+                <circle cx="160" cy="95" r="44" fill="#E6FF00" fill-opacity="0.16" stroke="#111214" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />
+                <text x="165" y="55" font-size="8" font-weight="700" fill="#334155">徒歩5分圏</text>
+                <text x="165" y="22" font-size="8" font-weight="700" fill="#475569">自転車10分圏</text>
+              </svg>
+
+              <div class="relative z-10 flex items-center justify-between gap-1">
+                <span class="bg-white/95 border border-neutral-300 px-2 py-0.5 rounded-md text-[10px] font-black text-neutral-800 truncate max-w-[190px]">
+                  ● 物件: <span id="miniMapPropertyLabel">清水4丁目</span>
+                </span>
+                <span id="miniMapStopBadge" class="bg-[#111214] text-[#E6FF00] px-2 py-0.5 rounded-md text-[10px] font-black shrink-0">
+                  普通停車
+                </span>
+              </div>
+
+              <div class="relative z-10 grid grid-cols-3 gap-1.5 text-[10px] font-bold">
+                <div class="bg-white/95 rounded-lg px-2 py-1 border border-neutral-200 truncate">🚉 <span id="pinStationText">清水駅(3分)</span></div>
+                <div class="bg-white/95 rounded-lg px-2 py-1 border border-neutral-200 truncate">🛒 スーパー・商店街</div>
+                <div class="bg-white/95 rounded-lg px-2 py-1 border border-neutral-200 truncate">♨ 銭湯・ジム・図書館</div>
+                <div class="bg-white/95 rounded-lg px-2 py-1 border border-neutral-200 truncate">📮 大きめの郵便局</div>
+                <div class="bg-white/95 rounded-lg px-2 py-1 border border-neutral-200 truncate">🏥 複数クリニック</div>
+                <div class="bg-white/95 rounded-lg px-2 py-1 border border-neutral-200 truncate">🚲 平地・自転車導線</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 【COLUMN 2】総合スコア・スマート推察（要確認フラグ）・要確認ポイント・保存比較 -->
+        <div id="colScoreAndCompare" class="space-y-4">
+          <!-- 総合スコアカード -->
+          <div class="bg-[#111214] text-white rounded-2xl p-4 shadow-md space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <span class="text-[10px] font-black uppercase tracking-wider text-[#E6FF00]">Total Evaluation</span>
+                <h2 id="evalTitleDisplay" class="text-base font-black leading-snug mt-0.5">物件名</h2>
+                <p id="evalVerdictText" class="text-xs text-neutral-300 mt-1 leading-relaxed">判定コメント</p>
+              </div>
+              <div class="shrink-0 bg-neutral-900 border border-neutral-700 rounded-2xl px-3.5 py-2 text-center min-w-[86px]">
+                <div class="flex items-baseline justify-center">
+                  <span id="totalScoreNum" class="text-3xl font-black text-[#E6FF00]">--</span>
+                  <span class="text-[11px] text-neutral-400 font-bold ml-0.5">点</span>
+                </div>
+                <div id="rankPill" class="mt-1 text-[10px] font-black px-2 py-0.5 rounded bg-emerald-400 text-neutral-950">
+                  判定中
+                </div>
+              </div>
+            </div>
+
+            <!-- 商談・提示モード用：条件達成＆交渉着地点サマリー -->
+            <div id="presenterSummaryBox" class="hidden bg-neutral-900 border border-neutral-700 rounded-xl p-3 space-y-1.5">
+              <div class="text-xs font-black text-[#E6FF00]">📋 ご提案・条件すり合わせシート</div>
+              <p id="presenterTargetText" class="text-xs text-neutral-200 leading-relaxed"></p>
+            </div>
+
+            <!-- 要確認ポイント（旧：地雷チェックをB2B商談でも提示可能な表現へ統一） -->
+            <div id="alignmentAlertBox" class="bg-amber-950/75 border border-amber-500/60 rounded-xl p-3 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-amber-300">🔍 要確認ポイント（優先すり合わせ事項）</span>
+                <span id="alignmentCountBadge" class="text-[10px] font-black bg-amber-500 text-neutral-950 px-2 py-0.5 rounded-full">0件</span>
+              </div>
+              <ul id="alignmentAlertList" class="text-xs text-amber-100 space-y-1 font-medium"></ul>
+            </div>
+
+            <div class="flex gap-2 pt-1">
+              <button onclick="saveCurrentToComparison()" class="flex-1 volt-btn rounded-xl py-2.5 text-xs font-black">
+                比較リストに保存
+              </button>
+              <button onclick="copyAgentTalkScript()" class="bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold px-3 rounded-xl border border-neutral-700">
+                商談メモ複製
+              </button>
+            </div>
+          </div>
+
+          <!-- スマート推察（未記載項目の自動補完＆会話のきっかけ） -->
+          <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">04 / スマート推察＆会話フック</span>
+              <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">未記載を自動推察</span>
+            </div>
+            <p class="text-[11px] text-neutral-500">チラシ未記載の項目を築年数・階数・賃料・面積から推察し、角の立たない確認フレーズを提示します。</p>
+            <div id="smartInferenceList" class="space-y-2">
+              <!-- JSで推察カードを描画 -->
+            </div>
+          </div>
+
+          <!-- 保存済み物件のクイック比較バー -->
+          <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">05 / 保存物件の横並び比較</span>
+              <div class="flex items-center gap-2">
+                <span id="savedCountLabel" class="text-xs font-black text-[#111214]">0件保存</span>
+                <button onclick="clearComparisonList()" class="text-[10px] font-bold text-neutral-400 hover:text-rose-600 underline">クリア</button>
+              </div>
+            </div>
+            <div id="comparisonBoard" class="overflow-x-auto no-scrollbar">
+              <p class="text-xs text-neutral-400 py-3 text-center">「比較リストに保存」を押すと、ここに複数物件が並びます。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 【COLUMN 3】統合チェックリスト＆カスタム項目管理（追加・削除・重み調整） -->
+        <div id="colCustomMatrix" class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">06 / カスタム評価マトリクス</span>
+              <h3 class="text-sm font-black text-[#111214]">項目ごとの評価・追加/削除・重み調整</h3>
+            </div>
+            <button onclick="resetDefaultCriteria()" class="text-[11px] font-bold text-neutral-500 hover:text-[#111214] underline shrink-0">
+              初期状態に戻す
+            </button>
+          </div>
+
+          <!-- 新規カスタム項目追加フォーム（はみ出し防止の2段レイアウト） -->
+          <div class="bg-[#F8F8F6] border border-[#DCDCD6] rounded-xl p-2.5 space-y-2">
+            <div class="text-[11px] font-black text-neutral-700">+ 評価項目を自由に追加</div>
+            <!-- 1段目：全幅テキスト入力 -->
+            <input id="newItemNameInput" type="text" placeholder="例：近くに業務スーパー、大きめの郵便局"
+              class="w-full bg-white border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-[#111214]" />
+            <!-- 2段目：カテゴリ・重み・追加ボタン（枠内に確実に収まるグリッド） -->
+            <div class="grid grid-cols-12 gap-1.5">
+              <select id="newItemCatSelect" class="col-span-5 bg-white border border-[#DCDCD6] rounded-lg px-2 py-1.5 text-xs font-bold min-w-0">
+                <option value="住戸の状態">住戸の状態</option>
+                <option value="生活導線">生活導線</option>
+                <option value="アクセス">アクセス</option>
+                <option value="ランニングコスト">ランニングコスト</option>
+                <option value="建物・管理">建物・管理</option>
+                <option value="要確認ポイント">要確認ポイント</option>
+              </select>
+              <select id="newItemWeightSelect" class="col-span-4 bg-white border border-[#DCDCD6] rounded-lg px-2 py-1.5 text-xs font-bold min-w-0">
+                <option value="1">重み x1</option>
+                <option value="2" selected>重み x2</option>
+                <option value="3">重み x3（重要）</option>
+              </select>
+              <button onclick="addCustomCriteriaItem()" class="col-span-3 bg-[#111214] hover:bg-neutral-800 text-[#E6FF00] text-xs font-black py-1.5 rounded-lg">
+                追加
+              </button>
+            </div>
+          </div>
+
+          <!-- カテゴリフィルタ（折り返し表示で右切れ防止） -->
+          <div id="categoryFilterChips" class="flex flex-wrap gap-1.5">
+            <!-- JSでカテゴリチップ描画 -->
+          </div>
+
+          <!-- 評価項目リスト（〇/△/×、重み調整、削除ボタン） -->
+          <div id="criteriaListContainer" class="space-y-2 max-h-[540px] overflow-y-auto pr-0.5">
+            <!-- JSで項目描画 -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- STEP 2: 内見チェック表（現地確認・電波・騒音・水回り・導線）         -->
+    <!-- =================================================================== -->
+    <section id="stepSectionViewing" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">Step 02 / 現地内見チェック</span>
+            <h2 class="text-base font-black text-[#111214]">内見チェック表（タップで記録）</h2>
+          </div>
+          <span id="viewingProgressBadge" class="text-xs font-black bg-[#111214] text-[#E6FF00] px-2.5 py-1 rounded-full">0 / 0 完了</span>
+        </div>
+        <div id="viewingChecklistContainer" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- STEP 3: 契約時チェック（初期費用・違約金・更新・保証会社・重説）     -->
+    <!-- =================================================================== -->
+    <section id="stepSectionContract" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-black uppercase tracking-wider text-neutral-400">Step 03 / 契約前最終防衛</span>
+            <h2 class="text-base font-black text-[#111214]">契約時チェック項目（サイン前確認）</h2>
+          </div>
+          <span id="contractProgressBadge" class="text-xs font-black bg-[#111214] text-[#E6FF00] px-2.5 py-1 rounded-full">0 / 0 完了</span>
+        </div>
+        <div id="contractChecklistContainer" class="space-y-2"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Pixel 8a (Android Chrome) PWAインストール案内モーダル -->
+  <div id="pwaModal" class="hidden fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full rounded-2xl p-5 space-y-3 shadow-2xl border border-[#DCDCD6]">
+      <div class="flex items-center justify-between border-b border-neutral-200 pb-2.5">
+        <h3 class="text-sm font-black text-[#111214]">Pixel 8a（Android・Chrome）への追加方法</h3>
+        <button onclick="closePwaModal()" class="w-7 h-7 rounded-full bg-neutral-100 font-bold text-neutral-600">&times;</button>
+      </div>
+      <ol class="text-xs text-neutral-700 space-y-2 list-decimal list-inside font-medium leading-relaxed">
+        <li>テスト版HTMLをGitHub PagesやCloudflare Pages等の<strong>HTTPSのURL</strong>に配置して、Pixel 8aの<strong>Chrome</strong>で開きます。</li>
+        <li>画面右上の<strong>メニュー（縦の3点リーダー <code class="bg-neutral-100 px-1 rounded">⋮</code>）</strong>をタップします。</li>
+        <li><strong>「ホーム画面に追加」</strong>（または「アプリをインストール」）を選びます。</li>
+        <li><strong>「追加」</strong>を押すと、ホーム画面にアイコンが置かれ、アプリ感覚で起動できます。</li>
+      </ol>
+      <p class="text-[11px] text-neutral-500 bg-[#F8F8F6] p-2.5 rounded-xl">
+        ※複数タブや対応環境で同じ4桁数字（例：<code class="font-bold">4829</code>）を入力して「接続」を押すと、入力状態や比較リストを揃えて確認できます。
+      </p>
+      <button onclick="closePwaModal()" class="w-full volt-btn rounded-xl py-2.5 text-xs font-black">
+        わかった
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. 初期データ定義（ビジネス表現統一・賃貸特化チェックリスト）
+    // =========================================================================
+    const MUST_HAVE_DEFS = [
+      { id: 'rc', label: 'RC/SRC造' },
+      { id: 'ev', label: 'エレベーター' },
+      { id: 'indoor_wash', label: '室内洗濯機' },
+      { id: 'separate_bt', label: '風呂トイレ別' },
+      { id: 'rect_room', label: '整形間取り' },
+      { id: 'deep_closet', label: '収納奥行き' }
+    ];
+
+    const DEFAULT_CRITERIA = [
+      // 住戸の状態
+      { id: 'c_sun', category: '住戸の状態', name: '日当たり（良／普通／悪）', weight: 2, status: 'good', isAlignmentPoint: false },
+      { id: 'c_view', category: '住戸の状態', name: '眺望（抜けている／普通／塞がっている）', weight: 1, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_noise', category: '住戸の状態', name: '騒音（幹線道路／線路／店舗・近隣）', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_damp', category: '住戸の状態', name: '湿気・カビ対策（階数・向き・通風）', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_heater', category: '住戸の状態', name: '給湯器の方式・年式・状態', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_amp', category: '住戸の状態', name: '電気容量（30A以上・在宅作業対応）', weight: 2, status: 'good', isAlignmentPoint: false },
+      { id: 'c_reform', category: '住戸の状態', name: '室内の清潔感・リフォーム状態（床・壁・水回り）', weight: 2, status: 'good', isAlignmentPoint: false },
+
+      // 生活導線
+      { id: 'c_super', category: '生活導線', name: 'スーパーまでの距離（業務スーパー・中規模スーパー）', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_drug', category: '生活導線', name: 'ドラッグストア・大きめの郵便局への近さ', weight: 2, status: 'good', isAlignmentPoint: false },
+      { id: 'c_clinic', category: '生活導線', name: '病院・複数クリニックへのアクセス', weight: 2, status: 'good', isAlignmentPoint: false },
+      { id: 'c_bike_park', category: '生活導線', name: '駐輪場の有無・停めやすさ・料金', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_mall', category: '生活導線', name: '大型商業施設（イオン等）への自転車・バス圏アクセス', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_slope', category: '生活導線', name: '坂の有無（平坦で自転車生活に快適か）', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_bath_gym', category: '生活導線', name: '銭湯・健康ランド・chocoZAP・図書館・商店街密度', weight: 2, status: 'fair', isAlignmentPoint: false },
+
+      // アクセス
+      { id: 'c_walk', category: 'アクセス', name: '最寄り駅までの距離（徒歩分数）', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_bus', category: 'アクセス', name: 'バス停までの距離・運行本数', weight: 1, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_night_safe', category: 'アクセス', name: '夜道の明るさ・人通り・街の落ち着き', weight: 2, status: 'fair', isAlignmentPoint: false },
+
+      // ランニングコスト
+      { id: 'c_gas', category: 'ランニングコスト', name: '水道・ガスの方式（都市ガス／プロパン）', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_net', category: 'ランニングコスト', name: 'インターネット設備（光対応・実効速度）', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_renewal', category: 'ランニングコスト', name: '更新料の軽さ（なし or 1万円以下）・契約期間条件', weight: 2, status: 'fair', isAlignmentPoint: false },
+
+      // 建物・管理
+      { id: 'c_seismic', category: '建物・管理', name: '耐震基準・構造（新耐震／旧耐震・RC造）', weight: 2, status: 'bad', isAlignmentPoint: false },
+      { id: 'c_tile', category: '建物・管理', name: '外壁・共用部（廊下・階段・エントランス）の管理状態', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_garbage', category: '建物・管理', name: 'ゴミ置き場の清潔さ・ルール遵守状況', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_residents', category: '建物・管理', name: '住民層の落ち着き・下町的な暮らしやすさ', weight: 2, status: 'fair', isAlignmentPoint: false },
+
+      // 要確認ポイント（旧：地雷チェックからB2B商談向け表現へ改定）
+      { id: 'a_ev_upper', category: '要確認ポイント', name: 'エレベーター有無と上階移動の負担（3階以上など）', weight: 3, status: 'bad', isAlignmentPoint: true },
+      { id: 'a_life_density', category: '要確認ポイント', name: '日常の買い物・生活インフラ密度の確保', weight: 3, status: 'fair', isAlignmentPoint: true },
+      { id: 'a_guarantor', category: '要確認ポイント', name: '保証会社の審査柔軟性（資産保有・独立系対応等）', weight: 3, status: 'fair', isAlignmentPoint: true }
+    ];
+
+    const VIEWING_ITEMS = [
+      '楽天モバイルの電波・テザリング速度を窓際＆部屋奥で実測した',
+      '窓を閉めた状態で幹線道路・線路・隣室の騒音レベルを確認した',
+      '室内洗濯機置場の防水パン・水栓・排水位置を確認した',
+      '収納の奥行き・ハンガー掛けの高さ・湿気臭をチェックした',
+      '給湯器リモコン・水圧・お湯が出るまでの時間を確認した',
+      'エントランス・ポスト・ゴミ置き場・駐輪場の管理状態を見た',
+      '最寄り駅からスーパー・ドラッグストア・銭湯・図書館・郵便局までの導線を確認した'
+    ];
+
+    const CONTRACT_ITEMS = [
+      '契約期間（1年契約か2年契約か）・更新料・更新事務手数料を確認した',
+      '短期解約違約金（1年未満解約時のペナルティ有無・金額）を確認した',
+      '保証会社の種類・初回保証料・年間/月額保証料を確認した',
+      '初期費用の明細（24時間サポート・消臭抗菌・鍵交換等の任意項目）を確認した',
+      '退去時の原状回復・クリーニング費用の負担ルールを書面で確認した'
+    ];
+
+    let state = {
+      roomCode: '4829',
+      viewportMode: 'mobile', // 'mobile' | 'pc'
+      presenterMode: false,
+      workflowStep: 'eval', // 'eval' | 'viewing' | 'contract'
+      activeCategory: 'ALL',
+      mustHaves: {
+        rc: true,
+        ev: false,
+        indoor_wash: true,
+        separate_bt: true,
+        rect_room: true,
+        deep_closet: false
+      },
+      property: {
+        title: '清水駅 徒歩3分（大阪市旭区清水4丁目・1DK）',
+        totalRentMan: 3.3,
+        walkMin: 3,
+        buildAge: 58,
+        floorNum: 4,
+        maxFloor: 4,
+        layout: '1DK',
+        areaSqm: 23,
+        stationLine: '大阪メトロ今里筋線 清水駅',
+        stopType: 'local',
+        hubType: 'single',
+        corridorVibe: 'shitamachi_flat'
+      },
+      criteria: JSON.parse(JSON.stringify(DEFAULT_CRITERIA)),
+      viewingChecked: {},
+      contractChecked: {},
+      savedList: []
+    };
+
+    // 同一ブラウザ内の他タブ（スマホ枠タブとPC商談タブ）とリアルタイム同期するチャネル
+    let syncChannel = null;
+    try {
+      if ('BroadcastChannel' in window) {
+        syncChannel = new BroadcastChannel('studiocalx_rental_sync_channel');
+        syncChannel.onmessage = (event) => {
+          const msg = event.data;
+          if (msg && msg.roomCode === state.roomCode && msg.payload) {
+            state = {
+              ...state,
+              ...msg.payload,
+              viewportMode: state.viewportMode, // 表示モードは各画面のものを維持
+              presenterMode: state.presenterMode
+            };
+            renderAll(true);
+          }
+        };
+      }
+    } catch (e) {}
+
+    // =========================================================================
+    // 2. 初期化・ルーム同期・永続化
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromRoomStorage('4829');
+      renderAll(true);
+    });
+
+    function getStorageKey(code) {
+      return `studiocalx_rental_v2_room_${code}`;
+    }
+
+    function saveToRoomStorage(skipBroadcast = false) {
+      try {
+        const cleanCode = sanitizeRoomCode(state.roomCode);
+        localStorage.setItem(getStorageKey(cleanCode), JSON.stringify(state));
+        if (!skipBroadcast && syncChannel) {
+          syncChannel.postMessage({ roomCode: cleanCode, payload: state });
+        }
+      } catch (e) {}
+    }
+
+    function loadFromRoomStorage(code) {
+      const cleanCode = sanitizeRoomCode(code);
+      state.roomCode = cleanCode;
+      document.getElementById('roomCodeInput').value = cleanCode;
+      try {
+        const raw = localStorage.getItem(getStorageKey(cleanCode));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          state = {
+            ...state,
+            ...parsed,
+            roomCode: cleanCode,
+            mustHaves: { ...state.mustHaves, ...(parsed.mustHaves || {}) },
+            property: { ...state.property, ...(parsed.property || {}) },
+            criteria: Array.isArray(parsed.criteria) && parsed.criteria.length > 0 ? parsed.criteria : JSON.parse(JSON.stringify(DEFAULT_CRITERIA))
+          };
+        }
+      } catch (e) {}
+    }
+
+    function sanitizeRoomCode(val) {
+      const digits = String(val || '').replace(/\D/g, '').slice(0, 4);
+      return digits.length === 4 ? digits : '4829';
+    }
+
+    function connectRoomCode() {
+      const raw = document.getElementById('roomCodeInput').value;
+      const digits = String(raw || '').replace(/\D/g, '');
+      if (digits.length !== 4) {
+        showToast('4桁の半角数字を入力してください（例：4829）');
+        return;
+      }
+      loadFromRoomStorage(digits);
+      saveToRoomStorage();
+      renderAll(true);
+      showToast(`ルーム #${digits} に接続・同期しました`);
+    }
+
+    function randomizeRoomCode() {
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      document.getElementById('roomCodeInput').value = code;
+      state.roomCode = code;
+      saveToRoomStorage();
+      renderAll(true);
+      showToast(`新しい4桁コード #${code} を発行しました`);
+    }
+
+    // =========================================================================
+    // 3. サンプル物件プリセット（清水駅3.3万円 / 布施駅6.2万円）
+    // =========================================================================
+    function loadShimizuSample() {
+      state.property = {
+        title: '清水駅 徒歩3分（大阪市旭区清水4丁目・1DK・1968年築）',
+        totalRentMan: 3.3,
+        walkMin: 3,
+        buildAge: 58,
+        floorNum: 4,
+        maxFloor: 4,
+        layout: '1DK',
+        areaSqm: 23,
+        stationLine: '大阪メトロ今里筋線 清水駅',
+        stopType: 'local',
+        hubType: 'single',
+        corridorVibe: 'shitamachi_flat'
+      };
+      state.mustHaves = {
+        rc: true,
+        ev: false,
+        indoor_wash: true,
+        separate_bt: true,
+        rect_room: true,
+        deep_closet: false
+      };
+      const mapStatus = {
+        c_sun: 'good',
+        c_walk: 'good',
+        c_gas: 'good',
+        c_net: 'fair',
+        c_renewal: 'fair',
+        c_seismic: 'bad',
+        c_tile: 'fair',
+        a_ev_upper: 'bad'
+      };
+      state.criteria.forEach(item => {
+        if (mapStatus[item.id]) item.status = mapStatus[item.id];
+      });
+      renderAll();
+      showToast('「清水駅 徒歩3分 / 3.3万円」サンプルを読み込みました');
+    }
+
+    function loadFuseSample() {
+      state.property = {
+        title: '布施駅 徒歩4分（1LDK 36㎡・急行停車・2路線ハブ・RC造EV付）',
+        totalRentMan: 6.2,
+        walkMin: 4,
+        buildAge: 14,
+        floorNum: 5,
+        maxFloor: 9,
+        layout: '1LDK',
+        areaSqm: 36,
+        stationLine: '近鉄大阪線・奈良線 布施駅',
+        stopType: 'express',
+        hubType: 'multi_hub',
+        corridorVibe: 'shitamachi_flat'
+      };
+      state.mustHaves = {
+        rc: true,
+        ev: true,
+        indoor_wash: true,
+        separate_bt: true,
+        rect_room: true,
+        deep_closet: true
+      };
+      state.criteria.forEach(item => {
+        if (['c_seismic', 'a_ev_upper', 'c_super', 'c_bike_park', 'c_slope', 'c_bath_gym', 'c_walk'].includes(item.id)) {
+          item.status = 'good';
+        }
+      });
+      renderAll();
+      showToast('「布施駅 徒歩4分 / 6.2万円（急行ハブ）」サンプルを読み込みました');
+    }
+
+    // =========================================================================
+    // 4. 画像読込（カメラ・写真）＆スキャン演出
+    // =========================================================================
+    function handleFlyerImage(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('previewImageEl').src = e.target.result;
+        document.getElementById('imagePreviewBox').classList.remove('hidden');
+        document.getElementById('scanOverlay').classList.remove('hidden');
+
+        setTimeout(() => {
+          document.getElementById('scanOverlay').classList.add('hidden');
+          runFullEvaluation();
+          showToast('チラシ画像を読み込みました。必要に応じて数値を微調整して採点できます');
+        }, 850);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearFlyerImage() {
+      document.getElementById('flyerCameraInput').value = '';
+      document.getElementById('flyerFileInput').value = '';
+      document.getElementById('previewImageEl').src = '';
+      document.getElementById('imagePreviewBox').classList.add('hidden');
+    }
+
+    // =========================================================================
+    // 5. 必須6項目トグル・沿線判定・スマート推察エンジン
+    // =========================================================================
+    function renderMustHaveChips() {
+      const container = document.getElementById('mustHaveChipsContainer');
+      let passedCount = 0;
+      container.innerHTML = MUST_HAVE_DEFS.map(def => {
+        const active = !!state.mustHaves[def.id];
+        if (active) passedCount++;
+        return `
+          <button type="button" onclick="toggleMustHave('${def.id}')"
+            class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${active ? 'bg-[#111214] text-[#E6FF00] border-[#111214]' : 'bg-white text-neutral-500 border-[#DCDCD6]'}">
+            ${active ? '✓' : '−'} ${def.label}
+          </button>
+        `;
+      }).join('');
+      const badge = document.getElementById('mustHaveSummaryBadge');
+      badge.textContent = `基本条件 ${passedCount}/6 充足`;
+      badge.className = `text-[10px] font-black px-2 py-0.5 rounded ${passedCount === 6 ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`;
+    }
+
+    function toggleMustHave(id) {
+      state.mustHaves[id] = !state.mustHaves[id];
+      renderMustHaveChips();
+      runFullEvaluation();
+    }
+
+    function evaluateRailNetwork(prop) {
+      let stopPoints = 4;
+      let stopLabel = '普通（各駅停車）';
+      if (prop.stopType === 'express') {
+        stopPoints = 12;
+        stopLabel = '急行・特急・新快速停車';
+      } else if (prop.stopType === 'semi_express') {
+        stopPoints = 8;
+        stopLabel = '準急・区間急行・快速停車';
+      }
+
+      let hubPoints = 2;
+      let hubLabel = '単一路線のみ';
+      if (prop.hubType === 'multi_hub') {
+        hubPoints = 10;
+        hubLabel = '2路線以上交差（ハブ駅）';
+      } else if (prop.hubType === 'nearby') {
+        hubPoints = 6;
+        hubLabel = '近接に別路線あり';
+      }
+
+      let vibePoints = 6;
+      let vibeLabel = '下町・商店街・平地◎';
+      if (prop.corridorVibe === 'urban_mixed') {
+        vibePoints = 5;
+        vibeLabel = '市街地・利便性○';
+      } else if (prop.corridorVibe === 'hill_quiet') {
+        vibePoints = 2;
+        vibeLabel = '坂道・郊外/静穏△';
+      }
+
+      const walkBonus = prop.walkMin <= 5 ? 3 : prop.walkMin <= 10 ? 1 : -2;
+      const totalRailScore = Math.max(0, Math.min(30, stopPoints + hubPoints + vibePoints + walkBonus));
+
+      return {
+        totalRailScore,
+        stopLabel,
+        summary: `${prop.stationLine || '最寄駅'}（徒歩${prop.walkMin}分）／種別：${stopLabel}／路線性：${hubLabel}／街並み：${vibeLabel}`
+      };
+    }
+
+    function generateSmartInferences(prop) {
+      const inferences = [];
+
+      // 1. エレベーター推察（建築基準法31mルール・築古低中層）
+      if (!state.mustHaves.ev && prop.buildAge >= 25 && prop.maxFloor <= 6) {
+        const isUpperNoEv = prop.floorNum >= 3;
+        inferences.push({
+          tag: isUpperNoEv ? 'EVなし濃厚・階段注意' : '設備推察',
+          badgeClass: isUpperNoEv ? 'bg-amber-200 text-amber-950' : 'bg-amber-100 text-amber-900',
+          title: `エレベーター：${prop.maxFloor}階建・築${prop.buildAge}年のため未設置の可能性が高い（建築基準法31mルール推察）`,
+          talk: `「${prop.maxFloor}階建の築年数なので階段物件かと思いますが、エレベーターの有無だけ教えていただけますか？」と確認できます。`
+        });
+      }
+
+      // 2. 耐震基準推察（1981年6月以前＝築45年以上）
+      if (prop.buildAge >= 45) {
+        inferences.push({
+          tag: '旧耐震ゾーン',
+          badgeClass: 'bg-amber-100 text-amber-900',
+          title: '耐震基準：1981年以前の旧耐震基準に該当する可能性',
+          talk: '「室内のリフォーム状態が良さそうですね。建物は旧耐震の世代かと思いますが、耐震補強や配管更新の履歴はありますか？」と自然に話題にできます。'
+        });
+      }
+
+      // 3. 収納奥行き・広さ推察
+      if (prop.areaSqm > 0 && prop.areaSqm <= 26) {
+        inferences.push({
+          tag: '面積推察',
+          badgeClass: 'bg-sky-100 text-sky-900',
+          title: `収納・居室バランス：${prop.areaSqm}㎡（${prop.layout}）のため収納は標準〜やや浅め想定`,
+          talk: '「面積的に収納は標準サイズかと思いますが、奥行きの深さやデスク配置の余白だけ内見で見させてください。」'
+        });
+      }
+
+      // 4. ネット方式＆楽天モバイル電波推察
+      if (prop.buildAge >= 20) {
+        inferences.push({
+          tag: '通信・電波推察',
+          badgeClass: 'bg-neutral-200 text-neutral-800',
+          title: '通信環境：建物内VDSL方式の可能性＆RC壁による電波減衰に注意',
+          talk: '「光対応表記でも建物内はVDSL方式のケースがあるため、現地で楽天モバイルのテザリング電波もあわせて確認しますね。」'
+        });
+      }
+
+      if (inferences.length === 0) {
+        inferences.push({
+          tag: 'バランス良好',
+          badgeClass: 'bg-emerald-100 text-emerald-900',
+          title: '基本スペック充足：日当たり・騒音・契約条件の最終すり合わせ段階',
+          talk: '「条件の適合度が高いので、あとは日当たり・周辺音・更新料や解約条件の詳細を確認できれば前向きに検討したいです。」'
+        });
+      }
+
+      return inferences;
+    }
+
+    // =========================================================================
+    // 6. 総合スコア計算・レンダリング
+    // =========================================================================
+    function syncInputsToProperty() {
+      state.property.title = document.getElementById('inpPropertyTitle').value;
+      state.property.totalRentMan = parseFloat(document.getElementById('inpTotalRentMan').value) || 0;
+      state.property.walkMin = parseInt(document.getElementById('inpWalkMin').value, 10) || 1;
+      state.property.buildAge = parseInt(document.getElementById('inpBuildAge').value, 10) || 0;
+      state.property.floorNum = parseInt(document.getElementById('inpFloorNum').value, 10) || 1;
+      state.property.maxFloor = parseInt(document.getElementById('inpMaxFloor').value, 10) || 1;
+      state.property.layout = document.getElementById('inpLayout').value;
+      state.property.areaSqm = parseFloat(document.getElementById('inpAreaSqm').value) || 0;
+      state.property.stationLine = document.getElementById('inpStationLine').value;
+      state.property.stopType = document.getElementById('selStopType').value;
+      state.property.hubType = document.getElementById('selHubType').value;
+      state.property.corridorVibe = document.getElementById('selCorridorVibe').value;
+    }
+
+    function runFullEvaluation(skipBroadcast = false) {
+      syncInputsToProperty();
+      const prop = state.property;
+
+      // 沿線・種別・路線ハブ評価（最大30点）
+      const rail = evaluateRailNetwork(prop);
+      document.getElementById('railScoreBadge').textContent = `路線点: ${rail.totalRailScore}/30`;
+      document.getElementById('railAnalysisSummary').textContent = rail.summary;
+
+      // ミニマップ＆外部Googleマップリンク更新
+      document.getElementById('miniMapPropertyLabel').textContent = prop.title.slice(0, 14);
+      document.getElementById('miniMapStopBadge').textContent = rail.stopLabel.split('（')[0];
+      document.getElementById('pinStationText').textContent = `${prop.stationLine.split(' ').pop() || '最寄駅'}(${prop.walkMin}分)`;
+      const mapQuery = encodeURIComponent(`${prop.stationLine} ${prop.title}`);
+      document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
+
+      // カスタム項目の重み付けスコア（最大70点相当に換算）
+      let earnedWeighted = 0;
+      let maxWeighted = 0;
+      let alignmentItems = [];
+
+      state.criteria.forEach(item => {
+        const w = Number(item.weight) || 1;
+        maxWeighted += w * 2;
+        if (item.status === 'good') {
+          earnedWeighted += w * 2;
+        } else if (item.status === 'fair') {
+          earnedWeighted += w * 1;
+        } else if (item.status === 'bad') {
+          if (item.isAlignmentPoint) {
+            alignmentItems.push(item.name);
+          }
+        }
+      });
+
+      // 基本必須条件の未充足項目を要確認ポイントへ自動連携
+      MUST_HAVE_DEFS.forEach(def => {
+        if (!state.mustHaves[def.id]) {
+          alignmentItems.push(`基本希望条件「${def.label}」の適合状況・代替可否`);
+        }
+      });
+
+      const criteriaScore70 = maxWeighted > 0 ? Math.round((earnedWeighted / maxWeighted) * 70) : 35;
+      const alignmentPenalty = Math.min(24, alignmentItems.length * 4);
+      const finalScore = Math.max(0, Math.min(100, rail.totalRailScore + criteriaScore70 - alignmentPenalty));
+
+      document.getElementById('evalTitleDisplay').textContent = prop.title || '名称未設定物件';
+      document.getElementById('totalScoreNum').textContent = finalScore;
+
+      let rankText = 'B: 条件次第で検討';
+      let rankClass = 'bg-amber-400 text-neutral-950';
+      let verdict = '主要条件と沿線バランスを確認しながら、内見・契約条件をすり合わせるフェーズです。';
+
+      if (finalScore >= 80) {
+        rankText = 'A: 有力・前向き検討';
+        rankClass = 'bg-[#E6FF00] text-[#111214]';
+        verdict = '条件適合度が高く、他候補と比較しても非常に有力なラインです。';
+      } else if (finalScore >= 60) {
+        rankText = 'B: 条件次第で検討';
+        rankClass = 'bg-emerald-400 text-neutral-950';
+        verdict = '強みはあるものの、築年数・路線種別・契約条件のバランスを見極めたい物件です。';
+      } else {
+        rankText = 'C: 条件すり合わせ要';
+        rankClass = 'bg-amber-400 text-neutral-950';
+        verdict = '要確認ポイントが多めです。優先条件との折り合いや代替候補との比較を推奨します。';
+      }
+
+      // 不動産屋提示モード vs 自分用モードの切替
+      const presenterBox = document.getElementById('presenterSummaryBox');
+      if (state.presenterMode) {
+        presenterBox.classList.remove('hidden');
+        document.getElementById('evalVerdictText').textContent = `希望条件マトリクス適合スコア：${finalScore}点（${rankText}）`;
+        const topNeeds = alignmentItems.slice(0, 2).join('／') || '契約詳細・現地環境';
+        document.getElementById('presenterTargetText').textContent =
+          `沿線評価（${rail.totalRailScore}/30点）と立地条件は魅力的です。「${topNeeds}」の条件が合致すれば、さらに前向きに検討可能です。`;
+      } else {
+        presenterBox.classList.add('hidden');
+        document.getElementById('evalVerdictText').textContent = verdict;
+      }
+
+      const pill = document.getElementById('rankPill');
+      pill.textContent = rankText;
+      pill.className = `mt-1 text-[10px] font-black px-2 py-0.5 rounded ${rankClass}`;
+
+      // 要確認ポイント描画
+      document.getElementById('alignmentCountBadge').textContent = `${alignmentItems.length}件`;
+      const alignListEl = document.getElementById('alignmentAlertList');
+      if (alignmentItems.length === 0) {
+        alignListEl.innerHTML = '<li class="text-emerald-300">・現在の設定では優先すり合わせ事項はすべてクリアしています。</li>';
+      } else {
+        alignListEl.innerHTML = alignmentItems.map(a => `<li>・${escapeHtml(a)}</li>`).join('');
+      }
+
+      // スマート推察描画（提示モード時は内部会話メモを非表示にして要旨のみ表示）
+      const inferences = generateSmartInferences(prop);
+      document.getElementById('smartInferenceList').innerHTML = inferences.map(inf => `
+        <div class="border border-neutral-200 rounded-xl p-2.5 bg-[#FAFAF8] space-y-1">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-[10px] font-black px-2 py-0.5 rounded ${inf.badgeClass}">${escapeHtml(inf.tag)}</span>
+            <span class="text-xs font-black text-[#111214]">${escapeHtml(inf.title)}</span>
+          </div>
+          ${state.presenterMode ? '' : `<p class="text-[11px] text-neutral-600 leading-relaxed">${escapeHtml(inf.talk)}</p>`}
+        </div>
+      `).join('');
+
+      saveToRoomStorage(skipBroadcast);
+    }
+
+    // =========================================================================
+    // 7. カスタム評価項目（追加・削除・状態切替・重み調整）
+    // =========================================================================
+    function renderCategoryChips() {
+      const cats = ['ALL', '住戸の状態', '生活導線', 'アクセス', 'ランニングコスト', '建物・管理', '要確認ポイント'];
+      const container = document.getElementById('categoryFilterChips');
+      container.innerHTML = cats.map(cat => {
+        const active = state.activeCategory === cat;
+        const label = cat === 'ALL' ? 'すべて' : cat;
+        return `<button onclick="setActiveCategory('${cat}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold border transition ${active ? 'bg-[#111214] text-[#E6FF00] border-[#111214]' : 'bg-white text-neutral-600 border-[#DCDCD6] hover:bg-neutral-50'}">${label}</button>`;
+      }).join('');
+    }
+
+    function setActiveCategory(cat) {
+      state.activeCategory = cat;
+      renderCategoryChips();
+      renderCriteriaList();
+    }
+
+    function renderCriteriaList() {
+      const container = document.getElementById('criteriaListContainer');
+      const filtered = state.activeCategory === 'ALL'
+        ? state.criteria
+        : state.criteria.filter(c => c.category === state.activeCategory);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-xs text-neutral-400 text-center py-4">このカテゴリの項目はありません。</p>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => `
+        <div class="border border-[#E4E4DE] rounded-xl p-2.5 bg-[#FAFAF8] space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <span class="text-[10px] font-bold text-neutral-400">${escapeHtml(item.category)}</span>
+              <div class="text-xs font-black text-[#111214] break-words">${escapeHtml(item.name)}</div>
+            </div>
+            <button onclick="deleteCriteriaItem('${item.id}')" title="項目を削除" class="text-[11px] font-bold text-neutral-400 hover:text-rose-600 px-1.5 py-0.5 shrink-0">
+              削除
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 text-[11px]">
+            <!-- 評価ステータス（〇 / △ / ×） -->
+            <div class="inline-flex rounded-lg overflow-hidden border border-[#DCDCD6] bg-white font-black">
+              <button onclick="setItemStatus('${item.id}', 'good')" class="px-2.5 py-1 ${item.status === 'good' ? 'bg-emerald-500 text-white' : 'text-neutral-600 hover:bg-neutral-100'}">〇</button>
+              <button onclick="setItemStatus('${item.id}', 'fair')" class="px-2.5 py-1 border-x border-[#DCDCD6] ${item.status === 'fair' ? 'bg-amber-400 text-neutral-950' : 'text-neutral-600 hover:bg-neutral-100'}">△</button>
+              <button onclick="setItemStatus('${item.id}', 'bad')" class="px-2.5 py-1 ${item.status === 'bad' ? 'bg-rose-500 text-white' : 'text-neutral-600 hover:bg-neutral-100'}">×</button>
+            </div>
+
+            <!-- 重み調整 -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-bold text-neutral-500">重み</span>
+              <select onchange="setItemWeight('${item.id}', this.value)" class="bg-white border border-[#DCDCD6] rounded-lg px-1.5 py-1 text-[11px] font-black">
+                <option value="1" ${item.weight === 1 ? 'selected' : ''}>x1</option>
+                <option value="2" ${item.weight === 2 ? 'selected' : ''}>x2</option>
+                <option value="3" ${item.weight === 3 ? 'selected' : ''}>x3</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setItemStatus(id, status) {
+      const target = state.criteria.find(c => c.id === id);
+      if (!target) return;
+      target.status = status;
+      renderCriteriaList();
+      runFullEvaluation();
+    }
+
+    function setItemWeight(id, weightVal) {
+      const target = state.criteria.find(c => c.id === id);
+      if (!target) return;
+      target.weight = parseInt(weightVal, 10) || 1;
+      runFullEvaluation();
+    }
+
+    function deleteCriteriaItem(id) {
+      state.criteria = state.criteria.filter(c => c.id !== id);
+      renderCriteriaList();
+      runFullEvaluation();
+      showToast('評価項目を削除しました');
+    }
+
+    function addCustomCriteriaItem() {
+      const nameInput = document.getElementById('newItemNameInput');
+      const name = nameInput.value.trim();
+      if (!name) {
+        showToast('追加する評価項目名を入力してください');
+        return;
+      }
+      const category = document.getElementById('newItemCatSelect').value;
+      const weight = parseInt(document.getElementById('newItemWeightSelect').value, 10) || 2;
+      state.criteria.unshift({
+        id: 'custom_' + Date.now(),
+        category,
+        name,
+        weight,
+        status: 'fair',
+        isAlignmentPoint: category === '要確認ポイント'
+      });
+      nameInput.value = '';
+      renderCriteriaList();
+      runFullEvaluation();
+      showToast(`「${name}」を追加しました`);
+    }
+
+    function resetDefaultCriteria() {
+      state.criteria = JSON.parse(JSON.stringify(DEFAULT_CRITERIA));
+      renderCriteriaList();
+      runFullEvaluation();
+      showToast('評価項目を初期リストに戻しました');
+    }
+
+    // =========================================================================
+    // 8. 保存・横並び比較 ＆ 商談メモ複製
+    // =========================================================================
+    function saveCurrentToComparison() {
+      syncInputsToProperty();
+      const score = parseInt(document.getElementById('totalScoreNum').textContent, 10) || 0;
+      const rail = evaluateRailNetwork(state.property);
+      const entry = {
+        id: Date.now().toString(),
+        title: state.property.title,
+        rent: state.property.totalRentMan,
+        walk: state.property.walkMin,
+        age: state.property.buildAge,
+        layoutArea: `${state.property.layout} / ${state.property.areaSqm}㎡`,
+        railPoints: rail.totalRailScore,
+        score
+      };
+      state.savedList.unshift(entry);
+      if (state.savedList.length > 8) state.savedList.pop();
+      renderComparisonBoard();
+      saveToRoomStorage();
+      showToast('比較リストに保存しました');
+    }
+
+    function clearComparisonList() {
+      state.savedList = [];
+      renderComparisonBoard();
+      saveToRoomStorage();
+      showToast('比較リストをクリアしました');
+    }
+
+    function renderComparisonBoard() {
+      document.getElementById('savedCountLabel').textContent = `${state.savedList.length}件保存`;
+      const board = document.getElementById('comparisonBoard');
+      if (state.savedList.length === 0) {
+        board.innerHTML = '<p class="text-xs text-neutral-400 py-3 text-center">「比較リストに保存」を押すと、ここに複数物件が並びます。</p>';
+        return;
+      }
+      board.innerHTML = `
+        <table class="w-full text-left border-collapse text-xs min-w-[440px]">
+          <thead>
+            <tr class="border-b-2 border-[#111214] text-[10px] font-black text-neutral-500">
+              <th class="py-1.5 pr-2">物件</th>
+              <th class="py-1.5 px-2">総合</th>
+              <th class="py-1.5 px-2">賃料</th>
+              <th class="py-1.5 px-2">徒歩/築</th>
+              <th class="py-1.5 px-2">路線点</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-200">
+            ${state.savedList.map(item => `
+              <tr>
+                <td class="py-2 pr-2 font-black text-[#111214] max-w-[140px] truncate">${escapeHtml(item.title)}</td>
+                <td class="py-2 px-2"><span class="bg-[#111214] text-[#E6FF00] px-1.5 py-0.5 rounded font-black">${item.score}点</span></td>
+                <td class="py-2 px-2 font-bold">${item.rent}万</td>
+                <td class="py-2 px-2 text-neutral-700">${item.walk}分 / 築${item.age}年</td>
+                <td class="py-2 px-2 font-bold">${item.railPoints}/30</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function copyAgentTalkScript() {
+      syncInputsToProperty();
+      const score = document.getElementById('totalScoreNum').textContent;
+      const rail = evaluateRailNetwork(state.property);
+      const text = [
+        `【物件評価メモ】${state.property.title}`,
+        `・総合スコア：${score}点（路線評価：${rail.totalRailScore}/30点）`,
+        `・条件：${state.property.totalRentMan}万円 / 徒歩${state.property.walkMin}分 / 築${state.property.buildAge}年 / ${state.property.layout} (${state.property.areaSqm}㎡)`,
+        `・路線判定：${rail.summary}`
+      ].join('\n');
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('商談・共有用メモをコピーしました');
+    }
+
+    // =========================================================================
+    // 9. 内見チェック表 ＆ 契約時チェック表
+    // =========================================================================
+    function renderChecklists() {
+      const vContainer = document.getElementById('viewingChecklistContainer');
+      let vDone = 0;
+      vContainer.innerHTML = VIEWING_ITEMS.map((label, idx) => {
+        const key = `v_${idx}`;
+        const checked = !!state.viewingChecked[key];
+        if (checked) vDone++;
+        return `
+          <label class="flex items-start gap-2.5 p-2.5 rounded-xl border ${checked ? 'bg-emerald-50/70 border-emerald-200' : 'bg-[#FAFAF8] border-[#E4E4DE]'} cursor-pointer">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleCheck('viewing', '${key}', this.checked)" class="mt-0.5 w-4 h-4 accent-[#111214]" />
+            <span class="text-xs font-bold ${checked ? 'line-through text-neutral-400' : 'text-[#111214]'}">${escapeHtml(label)}</span>
+          </label>
+        `;
+      }).join('');
+      document.getElementById('viewingProgressBadge').textContent = `${vDone} / ${VIEWING_ITEMS.length} 完了`;
+
+      const cContainer = document.getElementById('contractChecklistContainer');
+      let cDone = 0;
+      cContainer.innerHTML = CONTRACT_ITEMS.map((label, idx) => {
+        const key = `c_${idx}`;
+        const checked = !!state.contractChecked[key];
+        if (checked) cDone++;
+        return `
+          <label class="flex items-start gap-2.5 p-2.5 rounded-xl border ${checked ? 'bg-emerald-50/70 border-emerald-200' : 'bg-[#FAFAF8] border-[#E4E4DE]'} cursor-pointer">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleCheck('contract', '${key}', this.checked)" class="mt-0.5 w-4 h-4 accent-[#111214]" />
+            <span class="text-xs font-bold ${checked ? 'line-through text-neutral-400' : 'text-[#111214]'}">${escapeHtml(label)}</span>
+          </label>
+        `;
+      }).join('');
+      document.getElementById('contractProgressBadge').textContent = `${cDone} / ${CONTRACT_ITEMS.length} 完了`;
+    }
+
+    function toggleCheck(group, key, isChecked) {
+      if (group === 'viewing') {
+        state.viewingChecked[key] = isChecked;
+      } else {
+        state.contractChecked[key] = isChecked;
+      }
+      renderChecklists();
+      saveToRoomStorage();
+    }
+
+    // =========================================================================
+    // 10. 表示モード（スマホ / PC3カラム / 不動産屋提示モード）＆ ステップ切替
+    // =========================================================================
+    function setViewportMode(mode) {
+      state.viewportMode = mode;
+      const mainEl = document.getElementById('mainContainer');
+      const gridEl = document.getElementById('evalGrid');
+      const btnMob = document.getElementById('modeBtnMobile');
+      const btnPc = document.getElementById('modeBtnPc');
+
+      const col1 = document.getElementById('colInputAndMap');
+      const col2 = document.getElementById('colScoreAndCompare');
+      const col3 = document.getElementById('colCustomMatrix');
+
+      if (mode === 'pc') {
+        mainEl.className = 'flex-1 w-full max-w-7xl mx-auto px-3 sm:px-5 py-4 transition-all duration-200';
+        gridEl.className = 'grid grid-cols-1 lg:grid-cols-3 gap-4 items-start';
+        // PC商談時は左にカスタムマトリクス、中央に比較＆地図、右に商談戦略＆入力を配置可能
+        col3.className = 'bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3 min-w-0 lg:order-1';
+        col2.className = 'space-y-4 lg:order-2';
+        col1.className = 'space-y-4 lg:order-3';
+
+        btnPc.className = 'px-2.5 py-1 rounded-lg bg-[#E6FF00] text-[#111214] font-black';
+        btnMob.className = 'px-2.5 py-1 rounded-lg text-neutral-300 hover:text-white';
+      } else {
+        mainEl.className = 'flex-1 w-full max-w-[460px] mx-auto px-3 sm:px-5 py-4 transition-all duration-200';
+        gridEl.className = 'grid grid-cols-1 gap-4';
+        col1.className = 'space-y-4';
+        col2.className = 'space-y-4';
+        col3.className = 'bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3 min-w-0';
+
+        btnMob.className = 'px-2.5 py-1 rounded-lg bg-[#E6FF00] text-[#111214] font-black';
+        btnPc.className = 'px-2.5 py-1 rounded-lg text-neutral-300 hover:text-white';
+      }
+      saveToRoomStorage();
+    }
+
+    function togglePresenterMode() {
+      state.presenterMode = !state.presenterMode;
+      const btn = document.getElementById('modeBtnPresent');
+      if (state.presenterMode) {
+        btn.textContent = '不動産屋提示用（適合度）';
+        btn.className = 'px-2.5 py-1.5 rounded-xl bg-emerald-400 border border-emerald-300 text-[11px] font-black text-[#111214]';
+        showToast('不動産屋提示モードに切り替えました');
+      } else {
+        btn.textContent = '自分用（詳細・メモ）';
+        btn.className = 'px-2.5 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-[11px] font-bold text-neutral-200 hover:text-white';
+        showToast('自分用詳細モードに戻しました');
+      }
+      runFullEvaluation(true);
+    }
+
+    function setWorkflowStep(step) {
+      state.workflowStep = step;
+      document.getElementById('stepSectionEval').classList.toggle('hidden', step !== 'eval');
+      document.getElementById('stepSectionViewing').classList.toggle('hidden', step !== 'viewing');
+      document.getElementById('stepSectionContract').classList.toggle('hidden', step !== 'contract');
+
+      const tabs = [
+        { id: 'stepTab1', key: 'eval' },
+        { id: 'stepTab2', key: 'viewing' },
+        { id: 'stepTab3', key: 'contract' }
+      ];
+      tabs.forEach(t => {
+        const el = document.getElementById(t.id);
+        if (t.key === step) {
+          el.className = 'px-3 py-1.5 rounded-xl text-xs font-black bg-[#111214] text-[#E6FF00]';
+        } else {
+          el.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-700 hover:bg-neutral-200';
+        }
+      });
+    }
+
+    function populatePropertyInputs() {
+      const p = state.property;
+      document.getElementById('inpPropertyTitle').value = p.title;
+      document.getElementById('inpTotalRentMan').value = p.totalRentMan;
+      document.getElementById('inpWalkMin').value = p.walkMin;
+      document.getElementById('inpBuildAge').value = p.buildAge;
+      document.getElementById('inpFloorNum').value = p.floorNum;
+      document.getElementById('inpMaxFloor').value = p.maxFloor;
+      document.getElementById('inpLayout').value = p.layout;
+      document.getElementById('inpAreaSqm').value = p.areaSqm;
+      document.getElementById('inpStationLine').value = p.stationLine;
+      document.getElementById('selStopType').value = p.stopType;
+      document.getElementById('selHubType').value = p.hubType;
+      document.getElementById('selCorridorVibe').value = p.corridorVibe;
+      document.getElementById('syncBannerInfo').textContent = `Room #${state.roomCode} 同期中（タブ間即時同期＆ローカル保存）`;
+    }
+
+    function renderAll(skipBroadcast = false) {
+      populatePropertyInputs();
+      renderMustHaveChips();
+      setViewportMode(state.viewportMode);
+      setWorkflowStep(state.workflowStep);
+      renderCategoryChips();
+      renderCriteriaList();
+      renderComparisonBoard();
+      renderChecklists();
+      runFullEvaluation(skipBroadcast);
+    }
+
+    // =========================================================================
+    // 11. モーダル・トースト・エスケープ
+    // =========================================================================
+    function openPwaModal() {
+      document.getElementById('pwaModal').classList.remove('hidden');
+    }
+    function closePwaModal() {
+      document.getElementById('pwaModal').classList.add('hidden');
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      document.getElementById('toastMessage').textContent = msg;
+      box.classList.remove('hidden');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => box.classList.add('hidden'), 3000);
+    }
+    function hideToast() {
+      document.getElementById('toastBox').classList.add('hidden');
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

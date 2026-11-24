@@ -2,18 +2,18 @@ export async function onRequestPost(context) {
   try {
     const apiKey = context.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not set" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Cloudflareのシークレット GEMINI_API_KEY が見つかりません" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const { imageBase64, mimeType = "image/jpeg" } = await context.request.json();
     if (!imageBase64) {
-      return new Response(JSON.stringify({ error: "imageBase64 is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "画像データが空です" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const prompt = `あなたは不動産マイソク（物件チラシ）の解析アシスタントです。
@@ -53,10 +53,11 @@ export async function onRequestPost(context) {
 
     const data = await res.json();
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: "Gemini API error", detail: data }), {
-        status: res.status,
-        headers: { "Content-Type": "application/json" },
-      });
+      const googleMsg = data?.error?.message || JSON.stringify(data);
+      return new Response(
+        JSON.stringify({ error: `Google側エラー (${res.status}): ${googleMsg}` }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
@@ -67,9 +68,9 @@ export async function onRequestPost(context) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || "Server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: `サーバーエラー: ${err.message || "不明"}` }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 }

@@ -9,10 +9,22 @@ export async function onRequestPost(context) {
     }
 
     const { imageBase64, mimeType = "image/jpeg" } = await context.request.json();
-    if (!imageBase64) {
+    if (!imageBase64 || typeof imageBase64 !== "string") {
       return new Response(
         JSON.stringify({ error: "画像データが空です" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (imageBase64.length > 16 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: "画像サイズが上限を超えています（12MB以下にしてください）" }),
+        { status: 413, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+      return new Response(
+        JSON.stringify({ error: "対応画像形式はJPEG・PNG・WebPです" }),
+        { status: 415, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -51,13 +63,17 @@ export async function onRequestPost(context) {
 画像から読み取れる情報をJSONのみで返してください（Markdownの\`\`\`は付けないこと）。
 キーは以下の通り：
 {
-  "title": "物件名・特徴の要約",
-  "rent_man": 数値またはnull（万円単位の賃料、例: 6.2）,
-  "station": "最寄り駅・徒歩分数",
+  "title": "物件名・所在地の短い表記",
+  "rent_man": 数値またはnull（万円単位の月額賃料）,
+  "station": "駅名・路線名のみ。徒歩分数は含めない",
+  "walk_min": 数値またはnull（駅徒歩分数）,
   "age_years": 数値またはnull（築年数）,
-  "structure": "構造・階数（例: RC造 8階建/3階）",
-  "layout": "間取り・面積",
-  "notes": "設備・備考・懸念点（EV有無や再建築不可などの推測メモも簡潔に）"
+  "structure": "建物構造のみ（木造・鉄骨造・RC造など）",
+  "floor_num": 数値またはnull（対象住戸の所在階）,
+  "max_floor": 数値またはnull（建物の地上階数）,
+  "layout": "間取りのみ（ワンルーム・1K・1DKなど）",
+  "area_sqm": 数値またはnull（専有面積、平方メートル）,
+  "notes": "設備・備考。画像に書かれていない情報は推測せず、未記載とする"
 }`;
 
     const payload = JSON.stringify({
@@ -74,6 +90,10 @@ export async function onRequestPost(context) {
           ],
         },
       ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
     });
 
     let lastStatus = 500;
@@ -91,10 +111,37 @@ export async function onRequestPost(context) {
       if (res.ok) {
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         const cleaned = rawText.replace(/```json|```/g, "").trim();
-        return new Response(cleaned, {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        try {
+          const parsed = JSON.parse(cleaned);
+          const numericOrNull = (value) => {
+            if (value === null || value === undefined || value === "") return null;
+            const number = Number(value);
+            return Number.isFinite(number) && number >= 0 ? number : null;
+          };
+          const textOrEmpty = (value) => typeof value === "string" ? value.trim().slice(0, 500) : "";
+          const result = {
+            title: textOrEmpty(parsed.title),
+            rent_man: numericOrNull(parsed.rent_man),
+            station: textOrEmpty(parsed.station),
+            walk_min: numericOrNull(parsed.walk_min),
+            age_years: numericOrNull(parsed.age_years),
+            structure: textOrEmpty(parsed.structure),
+            floor_num: numericOrNull(parsed.floor_num),
+            max_floor: numericOrNull(parsed.max_floor),
+            layout: textOrEmpty(parsed.layout),
+            area_sqm: numericOrNull(parsed.area_sqm),
+            notes: textOrEmpty(parsed.notes)
+          };
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+          });
+        } catch (_) {
+          return new Response(
+            JSON.stringify({ error: "AIの返答を正しいJSONとして読み取れませんでした。画像を変えて再試行してください。" }),
+            { status: 502, headers: { "Content-Type": "application/json; charset=utf-8" } }
+          );
+        }
       }
 
       lastStatus = res.status;

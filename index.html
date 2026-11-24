@@ -92,17 +92,17 @@
 
       <!-- 4桁数字ルーム同期バー -->
       <div class="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1">
-        <span class="text-[10px] font-bold text-neutral-400">同期4桁</span>
+        <span class="text-[10px] font-bold text-neutral-400">端末内4桁</span>
         <input id="roomCodeInput" type="text" maxlength="4" inputmode="numeric" value="4829"
           aria-label="4桁同期コード"
           class="w-12 bg-neutral-800 text-[#E6FF00] font-black text-xs text-center rounded-md py-1 tracking-widest focus:outline-none focus:ring-1 focus:ring-[#E6FF00]" />
         <button onclick="connectRoomCode()" class="bg-[#E6FF00] text-[#111214] text-[11px] font-black px-2 py-1 rounded-md hover:bg-[#D6EE00]">
-          接続
+          切替
         </button>
         <button onclick="randomizeRoomCode()" title="4桁番号をランダム生成" class="bg-neutral-800 text-neutral-200 text-[11px] font-bold px-2 py-1 rounded-md hover:bg-neutral-700">
           乱数
         </button>
-        <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" title="4桁コード同期稼働中"></span>
+        <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" title="同一ブラウザ内タブ同期"></span>
       </div>
 
       <!-- 表示モード切替（スマホ / PC / 不動産屋提示モード）＆ Pixel 8a 導入ガイド -->
@@ -140,7 +140,7 @@
         </button>
       </div>
       <div id="syncBannerInfo" class="text-[11px] font-bold text-neutral-500 shrink-0 hidden md:block">
-        Room #4829 同期中（タブ間即時同期＆ローカル保存）
+        Room #4829（同一ブラウザ内タブ同期・端末内保存）
       </div>
     </div>
   </div>
@@ -295,6 +295,7 @@
             <div id="railAnalysisSummary" class="bg-[#F8F8F6] rounded-xl p-2.5 text-xs text-neutral-700 font-medium leading-relaxed border border-neutral-200">
               <!-- JSで沿線分析を表示 -->
             </div>
+            <p class="text-[10px] text-neutral-500">※路線・停車種別・乗換ハブ性は選択内容に基づく簡易評価です。最新の運行情報や駅データを自動照合する機能ではありません。</p>
           </div>
 
           <!-- ミニ地図（同心円距離リング＆生活圏ピン＋外部地図リンク） -->
@@ -351,6 +352,7 @@
                 <span class="text-[10px] font-black uppercase tracking-wider text-[#E6FF00]">Total Evaluation</span>
                 <h2 id="evalTitleDisplay" class="text-base font-black leading-snug mt-0.5">物件名</h2>
                 <p id="evalVerdictText" class="text-xs text-neutral-300 mt-1 leading-relaxed">判定コメント</p>
+                <p class="text-[10px] text-amber-200 mt-1">※市場賃料や物件価格の査定ではありません。登録した希望条件に対する適合度の目安です。</p>
               </div>
               <div class="shrink-0 bg-neutral-900 border border-neutral-700 rounded-2xl px-3.5 py-2 text-center min-w-[86px]">
                 <div class="flex items-baseline justify-center">
@@ -707,7 +709,7 @@
       loadFromRoomStorage(digits);
       saveToRoomStorage();
       renderAll(true);
-      showToast(`ルーム #${digits} に接続・同期しました`);
+      showToast(`端末内ルーム #${digits} に切り替えました（別端末とは共有されません）`);
     }
 
     function randomizeRoomCode() {
@@ -716,7 +718,7 @@
       state.roomCode = code;
       saveToRoomStorage();
       renderAll(true);
-      showToast(`新しい4桁コード #${code} を発行しました`);
+      showToast(`端末内ルーム #${code} を作成しました（別端末とは共有されません）`);
     }
 
     // =========================================================================
@@ -893,13 +895,13 @@
     function generateSmartInferences(prop) {
       const inferences = [];
 
-      // 1. エレベーター推察（建築基準法31mルール・築古低中層）
+      // 1. エレベーター推察（築年数・建物階数からの参考推察。法令判定ではない）
       if (!state.mustHaves.ev && prop.buildAge >= 25 && prop.maxFloor <= 6) {
         const isUpperNoEv = prop.floorNum >= 3;
         inferences.push({
           tag: isUpperNoEv ? 'EVなし濃厚・階段注意' : '設備推察',
           badgeClass: isUpperNoEv ? 'bg-amber-200 text-amber-950' : 'bg-amber-100 text-amber-900',
-          title: `エレベーター：${prop.maxFloor}階建・築${prop.buildAge}年のため未設置の可能性が高い（建築基準法31mルール推察）`,
+          title: `エレベーター：${prop.maxFloor}階建・築${prop.buildAge}年のため未設置の可能性があります（現地・管理会社への確認が必要）`,
           talk: `「${prop.maxFloor}階建の築年数なので階段物件かと思いますが、エレベーターの有無だけ教えていただけますか？」と確認できます。`
         });
       }
@@ -907,9 +909,9 @@
       // 2. 耐震基準推察（1981年6月以前＝築45年以上）
       if (prop.buildAge >= 45) {
         inferences.push({
-          tag: '旧耐震ゾーン',
+          tag: '耐震基準の確認が必要',
           badgeClass: 'bg-amber-100 text-amber-900',
-          title: '耐震基準：1981年以前の旧耐震基準に該当する可能性',
+          title: '耐震基準：築年数だけでは断定できません。建築確認日・耐震診断・補強履歴を確認してください',
           talk: '「室内のリフォーム状態が良さそうですね。建物は旧耐震の世代かと思いますが、耐震補強や配管更新の履歴はありますか？」と自然に話題にできます。'
         });
       }
@@ -1403,7 +1405,7 @@
       document.getElementById('selStopType').value = p.stopType;
       document.getElementById('selHubType').value = p.hubType;
       document.getElementById('selCorridorVibe').value = p.corridorVibe;
-      document.getElementById('syncBannerInfo').textContent = `Room #${state.roomCode} 同期中（タブ間即時同期＆ローカル保存）`;
+      document.getElementById('syncBannerInfo').textContent = `Room #${state.roomCode}（同一ブラウザ内タブ同期・端末内保存）`;
     }
 
     function renderAll(skipBroadcast = false) {
@@ -1449,142 +1451,97 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
     }
- async function handleFlyerImage(event) {
-  const file = event?.target?.files?.[0];
-  if (!file) return;
+  async function handleFlyerImage(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
 
-  if (typeof showToast === "function") {
-    showToast("AIでマイソクを解析中...");
-  }
+    const scanBox = document.getElementById("scanOverlay");
+    const previewBox = document.getElementById("imagePreviewBox");
+    const previewImage = document.getElementById("previewImageEl");
 
-  try {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const s = String(reader.result || "");
-        resolve(s.includes(",") ? s.split(",")[1] : s);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    try {
+      if (!file.type.startsWith("image/")) throw new Error("画像ファイルを選択してください");
+      if (file.size > 12 * 1024 * 1024) throw new Error("画像は12MB以下にしてください");
 
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageBase64: base64,
-        mimeType: file.type || "image/jpeg",
-      }),
-    });
+      previewImage.src = URL.createObjectURL(file);
+      previewBox.classList.remove("hidden");
+      scanBox.classList.remove("hidden");
+      showToast("AIでマイソクを解析中...");
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data?.error || "解析に失敗しました");
-    }
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const value = String(reader.result || "");
+          resolve(value.includes(",") ? value.split(",")[1] : value);
+        };
+        reader.onerror = () => reject(new Error("画像を読み込めませんでした"));
+        reader.readAsDataURL(file);
+      });
 
-    const fireEvents = (el) => {
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      el.dispatchEvent(new Event("blur", { bubbles: true }));
-    };
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mimeType: file.type || "image/jpeg" })
+      });
 
-    // ラベル文言・placeholder・id・name に一致する入力欄へ値を流し込む関数
-    const setByKeywords = (keywords, val) => {
-      if (val === undefined || val === null || val === "") return;
-      const strVal = String(val);
-      const fields = Array.from(document.querySelectorAll("input, textarea, select")).filter(
-        (el) => el.type !== "file" && el.type !== "hidden"
-      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `解析に失敗しました（HTTP ${response.status}）`);
 
-      for (const el of fields) {
-        const ph = (el.getAttribute("placeholder") || "").toLowerCase();
-        const id = (el.id || "").toLowerCase();
-        const nm = (el.name || "").toLowerCase();
-
-        // 直前や親要素のラベルテキストを取得
-        const parentText = (el.closest("div, label")?.innerText || "").toLowerCase();
-        const prevText = (el.previousElementSibling?.innerText || "").toLowerCase();
-        const haystack = `${ph} ${id} ${nm} ${parentText} ${prevText}`;
-
-        const matched = keywords.some((kw) => haystack.includes(kw.toLowerCase()));
-        if (matched && "value" in el) {
-          el.value = strVal;
-          fireEvents(el);
+      // OCR値は項目IDに直接割り当てる。ラベル文字列の部分一致は誤入力を起こすため使わない。
+      const setValue = (id, value, type = "text") => {
+        if (value === undefined || value === null || value === "") return;
+        const element = document.getElementById(id);
+        if (!element) return;
+        if (type === "number") {
+          const number = Number(value);
+          if (!Number.isFinite(number)) return;
+          element.value = String(number);
+        } else {
+          element.value = String(value);
         }
-      }
-    };
+      };
 
-    const summaryMemo = [
-      data.station ? `最寄: ${data.station}` : "",
-      data.layout ? `間取り: ${data.layout}` : "",
-      data.structure ? `構造: ${data.structure}` : "",
-      data.age_years != null ? `築${data.age_years}年` : "",
-      data.notes || "",
-    ]
-      .filter(Boolean)
-      .join(" / ");
+      setValue("inpPropertyTitle", data.title);
+      setValue("inpTotalRentMan", data.rent_man, "number");
+      setValue("inpStationLine", data.station);
+      setValue("inpWalkMin", data.walk_min, "number");
+      setValue("inpBuildAge", data.age_years, "number");
+      setValue("inpFloorNum", data.floor_num, "number");
+      setValue("inpMaxFloor", data.max_floor, "number");
+      setValue("inpLayout", data.layout);
+      setValue("inpAreaSqm", data.area_sqm, "number");
 
-    setByKeywords(["物件名", "所在地", "タイトル", "title"], data.title);
-    setByKeywords(["家賃", "賃料", "rent"], data.rent_man);
-    setByKeywords(["駅", "徒歩", "路線", "station"], data.station);
-    setByKeywords(["築", "age"], data.age_years);
-    setByKeywords(["構造", "階", "structure"], data.structure);
-    setByKeywords(["間取り", "面積", "layout"], data.layout);
-    setByKeywords(["メモ", "備考", "推察", "memo", "note"], summaryMemo);
+      const summaryMemo = [
+        data.structure ? `構造: ${data.structure}` : "",
+        data.notes || ""
+      ].filter(Boolean).join(" / ");
 
-    // 画面上部のAI解析結果カードも更新
-    let box = document.getElementById("aiResultCard");
-    if (!box) {
-      box = document.createElement("div");
-      box.id = "aiResultCard";
-      box.style.cssText =
-        "margin:12px;padding:12px;border-radius:12px;background:#18181b;color:#f4f4f5;border:2px solid #eab308;font-size:13px;line-height:1.6;z-index:50;";
-      const mainTarget = document.querySelector("main") || document.body;
-      mainTarget.prepend(box);
-    }
+      const card = document.getElementById("aiResultCard") || document.createElement("section");
+      card.id = "aiResultCard";
+      card.className = "mx-3 my-3 p-3 rounded-xl bg-[#18181b] text-white border-2 border-yellow-500 text-xs leading-relaxed";
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <strong class="text-yellow-400">AI解析結果（マイソク読取）</strong>
+          <button type="button" onclick="this.closest('#aiResultCard').remove()" class="bg-neutral-700 rounded-md px-2 py-1">閉じる</button>
+        </div>
+        <div><b>物件:</b> ${escapeHtml(data.title || "未読取")}</div>
+        <div><b>賃料:</b> ${escapeHtml(data.rent_man ?? "未読取")} 万円 ／ <b>間取り:</b> ${escapeHtml(data.layout || "未読取")} ${data.area_sqm != null ? `／ ${escapeHtml(data.area_sqm)}㎡` : ""}</div>
+        <div><b>最寄駅:</b> ${escapeHtml(data.station || "未読取")} ${data.walk_min != null ? `（徒歩${escapeHtml(data.walk_min)}分）` : ""}</div>
+        <div><b>築年数:</b> ${escapeHtml(data.age_years ?? "未読取")} 年 ／ <b>構造:</b> ${escapeHtml(data.structure || "未読取")} ${data.floor_num != null ? `／ ${escapeHtml(data.floor_num)}階` : ""}${data.max_floor != null ? `・${escapeHtml(data.max_floor)}階建` : ""}</div>
+        <div><b>メモ:</b> ${escapeHtml(summaryMemo || "追加情報なし")}</div>
+        <p class="mt-2 text-[10px] text-amber-200">※ AI読取結果です。未記載・誤読の可能性があるため、原本と照合して修正してください。</p>
+      `;
+      if (!card.isConnected) (document.querySelector("main") || document.body).prepend(card);
 
-    const esc = (v) =>
-      String(v ?? "-")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-
-    box.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <strong style="color:#facc15;">AI解析結果（マイソク読取）</strong>
-        <button type="button" onclick="this.parentElement.parentElement.remove()" style="background:#3f3f46;color:#fff;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;">閉じる</button>
-      </div>
-      <div><strong>物件:</strong> ${esc(data.title)}</div>
-      <div><strong>家賃:</strong> ${esc(data.rent_man)} 万円 ／ <strong>間取り:</strong> ${esc(data.layout)}</div>
-      <div><strong>最寄駅:</strong> ${esc(data.station)}</div>
-      <div><strong>築年数:</strong> ${esc(data.age_years)} 年 ／ <strong>構造:</strong> ${esc(data.structure)}</div>
-      <div><strong>メモ・推察:</strong> ${esc(data.notes)}</div>
-    `;
-
-    // 既存の再計算・描画関数があれば呼び出す
-    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll", "updateUI", "recalc"]) {
-      if (typeof window[fnName] === "function") {
-        try {
-          window[fnName](data);
-        } catch (_) {}
-      }
-    }
-
-    if (typeof showToast === "function") {
-      showToast("マイソク解析と入力反映が完了しました");
-    }
-  } catch (err) {
-    if (typeof showToast === "function") {
-      showToast(`エラー: ${err.message}`);
-    } else {
-      alert(`解析エラー: ${err.message}`);
-    }
-  } finally {
-    if (event?.target) {
-      event.target.value = "";
+      runFullEvaluation();
+      showToast("解析結果を入力欄へ反映しました。原本との照合をお願いします。");
+    } catch (error) {
+      showToast(`解析エラー: ${error.message}`);
+    } finally {
+      scanBox?.classList.add("hidden");
+      if (event?.target) event.target.value = "";
     }
   }
-}
   </script>
 </body>
 </html>

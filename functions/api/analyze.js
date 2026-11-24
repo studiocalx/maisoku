@@ -1,4 +1,7 @@
-let modelCache = null;\nlet modelCacheAt = 0;\n\nexport async function onRequestPost(context) {
+let modelCache = null;
+let modelCacheAt = 0;
+
+export async function onRequestPost(context) {
   try {
     const apiKey = context.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -37,13 +40,6 @@ let modelCache = null;\nlet modelCacheAt = 0;\n\nexport async function onRequest
       modelCacheAt = Date.now();
     }
 
-    if (!listRes.ok) {
-      const msg = listData?.error?.message || JSON.stringify(listData);
-      return new Response(
-        JSON.stringify({ error: `モデル一覧の取得に失敗 (${listRes.status}): ${msg}` }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
 
     if (supportedModels.length === 0) {
       return new Response(

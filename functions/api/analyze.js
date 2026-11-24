@@ -9,10 +9,22 @@ export async function onRequestPost(context) {
     }
 
     const { imageBase64, mimeType = "image/jpeg" } = await context.request.json();
-    if (!imageBase64) {
+    if (!imageBase64 || typeof imageBase64 !== "string") {
       return new Response(
         JSON.stringify({ error: "画像データが空です" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (imageBase64.length > 16 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: "画像サイズが上限を超えています（12MB以下にしてください）" }),
+        { status: 413, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+      return new Response(
+        JSON.stringify({ error: "対応画像形式はJPEG・PNG・WebPです" }),
+        { status: 415, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -78,6 +90,10 @@ export async function onRequestPost(context) {
           ],
         },
       ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
     });
 
     let lastStatus = 500;
@@ -95,10 +111,37 @@ export async function onRequestPost(context) {
       if (res.ok) {
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         const cleaned = rawText.replace(/```json|```/g, "").trim();
-        return new Response(cleaned, {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        try {
+          const parsed = JSON.parse(cleaned);
+          const numericOrNull = (value) => {
+            if (value === null || value === undefined || value === "") return null;
+            const number = Number(value);
+            return Number.isFinite(number) && number >= 0 ? number : null;
+          };
+          const textOrEmpty = (value) => typeof value === "string" ? value.trim().slice(0, 500) : "";
+          const result = {
+            title: textOrEmpty(parsed.title),
+            rent_man: numericOrNull(parsed.rent_man),
+            station: textOrEmpty(parsed.station),
+            walk_min: numericOrNull(parsed.walk_min),
+            age_years: numericOrNull(parsed.age_years),
+            structure: textOrEmpty(parsed.structure),
+            floor_num: numericOrNull(parsed.floor_num),
+            max_floor: numericOrNull(parsed.max_floor),
+            layout: textOrEmpty(parsed.layout),
+            area_sqm: numericOrNull(parsed.area_sqm),
+            notes: textOrEmpty(parsed.notes)
+          };
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+          });
+        } catch (_) {
+          return new Response(
+            JSON.stringify({ error: "AIの返答を正しいJSONとして読み取れませんでした。画像を変えて再試行してください。" }),
+            { status: 502, headers: { "Content-Type": "application/json; charset=utf-8" } }
+          );
+        }
       }
 
       lastStatus = res.status;

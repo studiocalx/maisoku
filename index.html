@@ -92,17 +92,17 @@
 
       <!-- 4桁数字ルーム同期バー -->
       <div class="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1">
-        <span class="text-[10px] font-bold text-neutral-400">同期4桁</span>
+        <span class="text-[10px] font-bold text-neutral-400">端末内4桁</span>
         <input id="roomCodeInput" type="text" maxlength="4" inputmode="numeric" value="4829"
           aria-label="4桁同期コード"
           class="w-12 bg-neutral-800 text-[#E6FF00] font-black text-xs text-center rounded-md py-1 tracking-widest focus:outline-none focus:ring-1 focus:ring-[#E6FF00]" />
         <button onclick="connectRoomCode()" class="bg-[#E6FF00] text-[#111214] text-[11px] font-black px-2 py-1 rounded-md hover:bg-[#D6EE00]">
-          接続
+          切替
         </button>
         <button onclick="randomizeRoomCode()" title="4桁番号をランダム生成" class="bg-neutral-800 text-neutral-200 text-[11px] font-bold px-2 py-1 rounded-md hover:bg-neutral-700">
           乱数
         </button>
-        <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" title="4桁コード同期稼働中"></span>
+        <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" title="同一ブラウザ内タブ同期"></span>
       </div>
 
       <!-- 表示モード切替（スマホ / PC / 不動産屋提示モード）＆ Pixel 8a 導入ガイド -->
@@ -140,7 +140,7 @@
         </button>
       </div>
       <div id="syncBannerInfo" class="text-[11px] font-bold text-neutral-500 shrink-0 hidden md:block">
-        Room #4829 同期中（タブ間即時同期＆ローカル保存）
+        Room #4829（同一ブラウザ内タブ同期・端末内保存）
       </div>
     </div>
   </div>
@@ -707,7 +707,7 @@
       loadFromRoomStorage(digits);
       saveToRoomStorage();
       renderAll(true);
-      showToast(`ルーム #${digits} に接続・同期しました`);
+      showToast(`端末内ルーム #${digits} に切り替えました（別端末とは共有されません）`);
     }
 
     function randomizeRoomCode() {
@@ -716,7 +716,7 @@
       state.roomCode = code;
       saveToRoomStorage();
       renderAll(true);
-      showToast(`新しい4桁コード #${code} を発行しました`);
+      showToast(`端末内ルーム #${code} を作成しました（別端末とは共有されません）`);
     }
 
     // =========================================================================
@@ -1403,7 +1403,7 @@
       document.getElementById('selStopType').value = p.stopType;
       document.getElementById('selHubType').value = p.hubType;
       document.getElementById('selCorridorVibe').value = p.corridorVibe;
-      document.getElementById('syncBannerInfo').textContent = `Room #${state.roomCode} 同期中（タブ間即時同期＆ローカル保存）`;
+      document.getElementById('syncBannerInfo').textContent = `Room #${state.roomCode}（同一ブラウザ内タブ同期・端末内保存）`;
     }
 
     function renderAll(skipBroadcast = false) {

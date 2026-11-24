@@ -1453,15 +1453,6 @@
   const file = event?.target?.files?.[0];
   if (!file) return;
 
-  const setIfExists = (id, value) => {
-    const el = document.getElementById(id);
-    if (el && value !== undefined && value !== null && value !== "") {
-      el.value = value;
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-  };
-
   if (typeof showToast === "function") {
     showToast("AIでマイソクを解析中...");
   }
@@ -1491,33 +1482,72 @@
       throw new Error(data?.error || "解析に失敗しました");
     }
 
-    // よくある入力欄IDへ自動反映（存在するIDにだけ入ります）
-    setIfExists("propertyTitle", data.title);
-    setIfExists("titleInput", data.title);
-    setIfExists("rentInput", data.rent_man);
-    setIfExists("rent", data.rent_man);
-    setIfExists("stationInput", data.station);
-    setIfExists("station", data.station);
-    setIfExists("ageInput", data.age_years);
-    setIfExists("age", data.age_years);
-    setIfExists("structureInput", data.structure);
-    setIfExists("structure", data.structure);
-    setIfExists("layoutInput", data.layout);
-    setIfExists("layout", data.layout);
-    setIfExists("notesInput", data.notes);
-    setIfExists("notes", data.notes);
+    // 1. フォーム部品（input / textarea / select）へ反映するヘルパー
+    const fillField = (ids, val) => {
+      if (val === undefined || val === null || val === "") return false;
+      let hit = false;
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) {
+          if ("value" in el) {
+            el.value = String(val);
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+            hit = true;
+          }
+        }
+      }
+      return hit;
+    };
 
-    // 既存の再計算・描画関数があれば呼び出す
-    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll"]) {
+    fillField(["propertyTitle", "titleInput", "title", "propTitle", "nameInput"], data.title);
+    fillField(["rentInput", "rent", "priceInput", "price", "chinryo"], data.rent_man);
+    fillField(["stationInput", "station", "ekiInput", "eki", "accessInput"], data.station);
+    fillField(["ageInput", "age", "chikunenInput", "buildAge"], data.age_years);
+    fillField(["structureInput", "structure", "kozoInput", "floorInput"], data.structure);
+    fillField(["layoutInput", "layout", "madoriInput", "areaInput"], data.layout);
+    fillField(["notesInput", "notes", "memoInput", "memo", "commentInput"], data.notes);
+
+    // 2. 画面内にAI解析結果を表示するカードがなければ自動生成して最上部に表示
+    let box = document.getElementById("aiResultCard");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "aiResultCard";
+      box.style.cssText =
+        "margin:12px;padding:12px;border-radius:12px;background:#18181b;color:#f4f4f5;border:2px solid #eab308;font-size:13px;line-height:1.6;z-index:50;";
+      const mainTarget = document.querySelector("main") || document.body;
+      mainTarget.prepend(box);
+    }
+
+    const esc = (v) =>
+      String(v ?? "-")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <strong style="color:#facc15;">AI解析結果（マイソク読取）</strong>
+        <button type="button" onclick="this.parentElement.parentElement.remove()" style="background:#3f3f46;color:#fff;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;">閉じる</button>
+      </div>
+      <div><strong>物件:</strong> ${esc(data.title)}</div>
+      <div><strong>家賃:</strong> ${esc(data.rent_man)} 万円 ／ <strong>間取り:</strong> ${esc(data.layout)}</div>
+      <div><strong>最寄駅:</strong> ${esc(data.station)}</div>
+      <div><strong>築年数:</strong> ${esc(data.age_years)} 年 ／ <strong>構造:</strong> ${esc(data.structure)}</div>
+      <div><strong>メモ・推察:</strong> ${esc(data.notes)}</div>
+    `;
+
+    // 3. 既存の再計算・描画関数があれば呼び出す
+    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll", "updateUI"]) {
       if (typeof window[fnName] === "function") {
-        window[fnName](data);
+        try {
+          window[fnName](data);
+        } catch (_) {}
       }
     }
 
     if (typeof showToast === "function") {
       showToast("マイソク解析が完了しました");
-    } else {
-      alert(`読み取り完了: ${data.title || "物件"}（${data.rent_man ?? "-"}万円 / ${data.station || "-"}）`);
     }
   } catch (err) {
     if (typeof showToast === "function") {

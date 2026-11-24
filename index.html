@@ -84,7 +84,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-black tracking-tight">賃貸物件スピード査定AI</span>
-            <span class="text-[10px] font-black bg-neutral-800 text-[#E6FF00] px-1.5 py-0.5 rounded">studioCALX v2</span>
+            <span class="text-[10px] font-black bg-neutral-800 text-[#E6FF00] px-1.5 py-0.5 rounded">studioCALX v2.1</span>
           </div>
           <p class="text-[10px] text-neutral-400 hidden sm:block">スマホ撮影＆沿線判定 × PC商談比較 × 内見・契約チェック</p>
         </div>
@@ -184,55 +184,96 @@
               </button>
             </div>
 
+            <!-- 圧縮・OCRステータスバー -->
+            <div id="ocrStatusBanner" class="hidden rounded-xl bg-[#F8F8F6] border border-[#DCDCD6] px-3 py-2 text-[11px] text-neutral-700 space-y-1">
+              <div class="flex items-center justify-between gap-2">
+                <span id="ocrStatusText" class="font-bold text-[#111214]">待機中</span>
+                <span id="ocrCompressionMeta" class="text-[10px] font-mono text-neutral-500"></span>
+              </div>
+              <p id="ocrNotesText" class="hidden text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"></p>
+            </div>
+
             <!-- 画像プレビュー＆スキャン演出 -->
             <div id="imagePreviewBox" class="hidden relative rounded-xl overflow-hidden border border-[#DCDCD6] bg-neutral-900 aspect-[16/10] flex items-center justify-center">
-              <img id="previewImageEl" src="" alt="マイソク画像" class="max-h-full max-w-full object-contain" />
+              <img id="previewImageEl" src="" alt="マイソク画像" class="max-h-full max-w-full object-contain cursor-pointer" onclick="openImageLightbox()" title="タップで原寸プレビュー拡大" />
               <div id="scanOverlay" class="hidden absolute inset-0 bg-black/65 flex flex-col items-center justify-center text-white p-3 text-center">
                 <div class="scan-beam"></div>
                 <div class="w-8 h-8 border-3 border-[#E6FF00] border-t-transparent rounded-full animate-spin mb-2"></div>
                 <p class="text-xs font-black text-[#E6FF00]">マイソク＆沿線条件を解析中...</p>
+              </div>
+              <div class="absolute top-2 left-2 flex items-center gap-1">
+                <button onclick="openImageLightbox()" class="bg-black/75 text-white text-[10px] font-bold px-2 py-1 rounded-md hover:bg-black">
+                  拡大確認
+                </button>
+                <button onclick="downloadCurrentImageWithName()" class="bg-[#E6FF00] text-[#111214] text-[10px] font-black px-2 py-1 rounded-md hover:bg-[#D6EE00]">
+                  案件名付き保存
+                </button>
               </div>
               <button onclick="clearFlyerImage()" class="absolute top-2 right-2 bg-black/75 text-white text-[10px] font-bold px-2 py-1 rounded-md">
                 画像クリア
               </button>
             </div>
 
-            <!-- 物件スペック編集フォーム（撮影後の補正・手入力用） -->
+            <!-- 物件スペック編集フォーム（撮影後の補正・手入力用＋AI読取/手修正バッジ） -->
             <div class="pt-2 border-t border-neutral-100 grid grid-cols-2 gap-2 text-xs">
               <div class="col-span-2">
-                <label class="block text-[10px] font-bold text-neutral-500">物件名・所在地メモ</label>
-                <input id="inpPropertyTitle" type="text" oninput="runFullEvaluation()"
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-neutral-500">物件名・所在地メモ</label>
+                  <span id="badge_inpPropertyTitle" class="text-[9px] font-black px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500">初期/手入力</span>
+                </div>
+                <input id="inpPropertyTitle" type="text" oninput="onFieldInput('inpPropertyTitle')"
                   class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 font-bold text-[#111214]" />
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-neutral-500">賃料＋管理費（万円）</label>
-                <input id="inpTotalRentMan" type="number" step="0.1" oninput="runFullEvaluation()"
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-neutral-500">賃料＋管理費（万円）</label>
+                  <span id="badge_inpTotalRentMan" class="text-[9px] font-black px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500">初期/手入力</span>
+                </div>
+                <input id="inpTotalRentMan" type="number" step="0.1" oninput="onFieldInput('inpTotalRentMan')"
                   class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 font-black text-[#111214]" />
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-neutral-500">駅徒歩（分） / 築年数</label>
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-neutral-500">駅徒歩（分） / 築年数</label>
+                  <div class="flex gap-1">
+                    <span id="badge_inpWalkMin" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">歩</span>
+                    <span id="badge_inpBuildAge" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">築</span>
+                  </div>
+                </div>
                 <div class="flex gap-1 mt-0.5">
-                  <input id="inpWalkMin" type="number" min="1" max="60" oninput="runFullEvaluation()" title="徒歩分"
+                  <input id="inpWalkMin" type="number" min="1" max="60" oninput="onFieldInput('inpWalkMin')" title="徒歩分"
                     class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
-                  <input id="inpBuildAge" type="number" min="0" max="80" oninput="runFullEvaluation()" title="築年数"
+                  <input id="inpBuildAge" type="number" min="0" max="80" oninput="onFieldInput('inpBuildAge')" title="築年数"
                     class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-neutral-500">階数 / 建物階建</label>
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-neutral-500">階数 / 建物階建</label>
+                  <div class="flex gap-1">
+                    <span id="badge_inpFloorNum" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">階</span>
+                    <span id="badge_inpMaxFloor" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">建</span>
+                  </div>
+                </div>
                 <div class="flex gap-1 mt-0.5">
-                  <input id="inpFloorNum" type="number" min="1" max="60" oninput="runFullEvaluation()" placeholder="階"
+                  <input id="inpFloorNum" type="number" min="1" max="60" oninput="onFieldInput('inpFloorNum')" placeholder="階"
                     class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
-                  <input id="inpMaxFloor" type="number" min="1" max="60" oninput="runFullEvaluation()" placeholder="階建"
+                  <input id="inpMaxFloor" type="number" min="1" max="60" oninput="onFieldInput('inpMaxFloor')" placeholder="階建"
                     class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-neutral-500">間取り / 面積(㎡)</label>
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-neutral-500">間取り / 面積(㎡)</label>
+                  <div class="flex gap-1">
+                    <span id="badge_inpLayout" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">間</span>
+                    <span id="badge_inpAreaSqm" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">㎡</span>
+                  </div>
+                </div>
                 <div class="flex gap-1 mt-0.5">
-                  <input id="inpLayout" type="text" oninput="runFullEvaluation()"
+                  <input id="inpLayout" type="text" oninput="onFieldInput('inpLayout')"
                     class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
-                  <input id="inpAreaSqm" type="number" step="0.5" oninput="runFullEvaluation()"
+                  <input id="inpAreaSqm" type="number" step="0.5" oninput="onFieldInput('inpAreaSqm')"
                     class="w-1/2 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1.5 font-bold" />
                 </div>
               </div>
@@ -248,6 +289,23 @@
                 <!-- JSで必須6項目チップ描画 -->
               </div>
             </div>
+
+            <!-- アプリ内「案件別・画像フォルダ（IndexedDB）」 -->
+            <div class="pt-2.5 border-t border-neutral-100 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[10px] font-black text-neutral-600">📁 案件別・画像フォルダ（端末内保存）</span>
+                <div class="flex items-center gap-1">
+                  <input id="folderNameInput" type="text" placeholder="フォルダ名（例: 清水4丁目）"
+                    class="w-32 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2 py-1 text-[11px] font-bold" />
+                  <button onclick="saveCurrentImageToFolder()" class="bg-[#111214] text-[#E6FF00] text-[10px] font-black px-2 py-1 rounded-lg hover:bg-neutral-800">
+                    フォルダ保存
+                  </button>
+                </div>
+              </div>
+              <div id="folderAlbumContainer" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                <span class="text-[10px] text-neutral-400">撮影・読込後に「フォルダ保存」を押すとここに案件別で残ります。</span>
+              </div>
+            </div>
           </div>
 
           <!-- 沿線・停車種別・複数路線ハブ識別カード -->
@@ -259,8 +317,11 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <div>
-                <label class="block text-[10px] font-bold text-neutral-500">最寄駅・沿線</label>
-                <input id="inpStationLine" type="text" oninput="runFullEvaluation()"
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-neutral-500">最寄駅・沿線</label>
+                  <span id="badge_inpStationLine" class="text-[9px] font-black px-1 rounded bg-neutral-100 text-neutral-500">初期/手入力</span>
+                </div>
+                <input id="inpStationLine" type="text" oninput="onFieldInput('inpStationLine')"
                   class="w-full mt-0.5 bg-[#F8F8F6] border border-[#DCDCD6] rounded-lg px-2.5 py-1.5 font-bold" />
               </div>
               <div>
@@ -502,6 +563,22 @@
 
   </main>
 
+  <!-- 画像拡大ライトボックス -->
+  <div id="imageLightbox" class="hidden fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3" onclick="closeImageLightbox()">
+    <div class="w-full max-w-4xl flex items-center justify-between text-white text-xs mb-2" onclick="event.stopPropagation()">
+      <span id="lightboxCaption" class="font-bold truncate">マイソク原本プレビュー</span>
+      <div class="flex items-center gap-2 shrink-0">
+        <button onclick="downloadCurrentImageWithName()" class="bg-[#E6FF00] text-[#111214] font-black px-3 py-1.5 rounded-lg">
+          案件名付き保存
+        </button>
+        <button onclick="closeImageLightbox()" class="bg-neutral-800 text-white font-bold px-3 py-1.5 rounded-lg">
+          閉じる &times;
+        </button>
+      </div>
+    </div>
+    <img id="lightboxImageEl" src="" alt="拡大マイソク画像" class="max-h-[85vh] max-w-full object-contain rounded-lg border border-neutral-700" onclick="event.stopPropagation()" />
+  </div>
+
   <!-- Pixel 8a (Android Chrome) PWAインストール案内モーダル -->
   <div id="pwaModal" class="hidden fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-4">
     <div class="bg-white max-w-md w-full rounded-2xl p-5 space-y-3 shadow-2xl border border-[#DCDCD6]">
@@ -516,7 +593,7 @@
         <li><strong>「追加」</strong>を押すと、ホーム画面にアイコンが置かれ、アプリ感覚で起動できます。</li>
       </ol>
       <p class="text-[11px] text-neutral-500 bg-[#F8F8F6] p-2.5 rounded-xl">
-        ※複数タブや対応環境で同じ4桁数字（例：<code class="font-bold">4829</code>）を入力して「接続」を押すと、入力状態や比較リストを揃えて確認できます。
+        ※複数タブや対応環境で同じ4桁数字（例：<code class="font-bold">4829</code>）を入力して「接続」を押すと、入力状態や比較リストを揃えて確認できます。撮影した画像は端末内IndexedDBの案件フォルダにも保存できます。
       </p>
       <button onclick="closePwaModal()" class="w-full volt-btn rounded-xl py-2.5 text-xs font-black">
         わかった
@@ -558,226 +635,386 @@
 
       // アクセス
       { id: 'c_walk', category: 'アクセス', name: '最寄り駅までの距離（徒歩分数）', weight: 3, status: 'good', isAlignmentPoint: false },
-      { id: 'c_bus', category: 'アクセス', name: 'バス停までの距離・運行本数', weight: 1, status: 'fair', isAlignmentPoint: false },
-      { id: 'c_night_safe', category: 'アクセス', name: '夜道の明るさ・人通り・街の落ち着き', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_stop', category: 'アクセス', name: '停車種別（普通／準急・区間急行／急行・特急・新快速）', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_hub', category: 'アクセス', name: '複数路線・結節点（ハブ駅・乗換利便性）', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_commute', category: 'アクセス', name: '主要ターミナルへの所要時間・乗り換え回数', weight: 2, status: 'good', isAlignmentPoint: false },
 
       // ランニングコスト
-      { id: 'c_gas', category: 'ランニングコスト', name: '水道・ガスの方式（都市ガス／プロパン）', weight: 3, status: 'good', isAlignmentPoint: false },
-      { id: 'c_net', category: 'ランニングコスト', name: 'インターネット設備（光対応・実効速度）', weight: 2, status: 'fair', isAlignmentPoint: false },
-      { id: 'c_renewal', category: 'ランニングコスト', name: '更新料の軽さ（なし or 1万円以下）・契約期間条件', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_rent', category: 'ランニングコスト', name: '賃料＋管理費の予算適合度', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_gas', category: 'ランニングコスト', name: 'ガス種別（都市ガス／プロパン）と光熱費水準', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_renewal', category: 'ランニングコスト', name: '更新料・更新事務手数料・火災保険料', weight: 2, status: 'fair', isAlignmentPoint: false },
 
       // 建物・管理
-      { id: 'c_seismic', category: '建物・管理', name: '耐震基準・構造（新耐震／旧耐震・RC造）', weight: 2, status: 'bad', isAlignmentPoint: false },
-      { id: 'c_tile', category: '建物・管理', name: '外壁・共用部（廊下・階段・エントランス）の管理状態', weight: 2, status: 'fair', isAlignmentPoint: false },
-      { id: 'c_garbage', category: '建物・管理', name: 'ゴミ置き場の清潔さ・ルール遵守状況', weight: 2, status: 'fair', isAlignmentPoint: false },
-      { id: 'c_residents', category: '建物・管理', name: '住民層の落ち着き・下町的な暮らしやすさ', weight: 2, status: 'fair', isAlignmentPoint: false },
+      { id: 'c_struct', category: '建物・管理', name: '構造・耐震性（RC/SRC造・新耐震基準）', weight: 3, status: 'good', isAlignmentPoint: false },
+      { id: 'c_mgmt', category: '建物・管理', name: '共用部の清掃・ゴミ置き場・管理状態', weight: 2, status: 'good', isAlignmentPoint: false },
+      { id: 'c_parcel', category: '建物・管理', name: '宅配ボックス・オートロック・インターネット環境', weight: 2, status: 'fair', isAlignmentPoint: false },
 
-      // 要確認ポイント（旧：地雷チェックからB2B商談向け表現へ改定）
-      { id: 'a_ev_upper', category: '要確認ポイント', name: 'エレベーター有無と上階移動の負担（3階以上など）', weight: 3, status: 'bad', isAlignmentPoint: true },
-      { id: 'a_life_density', category: '要確認ポイント', name: '日常の買い物・生活インフラ密度の確保', weight: 3, status: 'fair', isAlignmentPoint: true },
-      { id: 'a_guarantor', category: '要確認ポイント', name: '保証会社の審査柔軟性（資産保有・独立系対応等）', weight: 3, status: 'fair', isAlignmentPoint: true }
+      // 要確認ポイント
+      { id: 'c_short_term', category: '要確認ポイント', name: '短期解約違約金（1年未満・2年未満の条件）', weight: 2, status: 'fair', isAlignmentPoint: true },
+      { id: 'c_moveout', category: '要確認ポイント', name: '退去時クリーニング代・原状回復特約の明確さ', weight: 2, status: 'fair', isAlignmentPoint: true },
+      { id: 'c_rule', category: '要確認ポイント', name: '自転車・生活ルール・管理規約上の制限事項', weight: 2, status: 'fair', isAlignmentPoint: true }
     ];
 
     const VIEWING_ITEMS = [
-      '楽天モバイルの電波・テザリング速度を窓際＆部屋奥で実測した',
-      '窓を閉めた状態で幹線道路・線路・隣室の騒音レベルを確認した',
-      '室内洗濯機置場の防水パン・水栓・排水位置を確認した',
-      '収納の奥行き・ハンガー掛けの高さ・湿気臭をチェックした',
-      '給湯器リモコン・水圧・お湯が出るまでの時間を確認した',
-      'エントランス・ポスト・ゴミ置き場・駐輪場の管理状態を見た',
-      '最寄り駅からスーパー・ドラッグストア・銭湯・図書館・郵便局までの導線を確認した'
+      { id: 'v1', title: 'スマホのモバイル通信（4G/5G）電波強度・室内入り具合', note: '窓際だけでなく奥の居室でも確認' },
+      { id: 'v2', title: '窓を閉めた状態＆開けた状態での騒音（車・電車・生活音）', note: '時間帯による交通量の変化も意識' },
+      { id: 'v3', title: '水回り（キッチン・洗面・浴室・洗濯機パン）の排水と臭い', note: '蛇口の水勢・給湯の温度立ち上がりも確認' },
+      { id: 'v4', title: '壁・天井・サッシ周辺のシミ・結露・カビ跡', note: '北側・角部屋・1階は特に念入りに' },
+      { id: 'v5', title: 'コンセント位置と数（デスク・冷蔵庫・電子レンジ・洗濯機）', note: '延長コード前提になりすぎないか確認' },
+      { id: 'v6', title: '玄関ドア・廊下・共用階段・駐輪場・ゴミ置場の管理状態', note: '放置自転車やゴミの散乱がないか' },
+      { id: 'v7', title: '最寄駅からの実際の歩きやすさ・街灯・坂・スーパー導線', note: 'マイソクの徒歩分数と体感のズレを確認' }
     ];
 
     const CONTRACT_ITEMS = [
-      '契約期間（1年契約か2年契約か）・更新料・更新事務手数料を確認した',
-      '短期解約違約金（1年未満解約時のペナルティ有無・金額）を確認した',
-      '保証会社の種類・初回保証料・年間/月額保証料を確認した',
-      '初期費用の明細（24時間サポート・消臭抗菌・鍵交換等の任意項目）を確認した',
-      '退去時の原状回復・クリーニング費用の負担ルールを書面で確認した'
+      { id: 'ct1', title: '月額総支払額（賃料＋管理費/共益費＋駐輪場代等）の再確認', note: '募集図面と契約書・重説で相違がないか' },
+      { id: 'ct2', title: '初期費用明細（敷金・礼金・前家賃・保証会社初回料・仲介手数料・鍵交換等）', note: '不要なオプション費用が含まれていないか確認' },
+      { id: 'ct3', title: '短期解約違約金の期間と金額（例：1年未満で賃料1ヶ月分など）', note: '転勤や住み替え可能性を踏まえて確認' },
+      { id: 'ct4', title: '退去時精算・ハウスクリーニング特約・エアコン清掃費の負担範囲', note: '借主負担となる特約条項を必ず書面で確認' },
+      { id: 'ct5', title: '更新料・更新事務手数料・家賃保証会社の更新料・引落手数料', note: '2年ごとの継続コストを把握' },
+      { id: 'ct6', title: '重要事項説明書（35条書面）の事前受領・不明点の解消', note: '契約当日ではなく事前確認が理想' }
     ];
 
-    let state = {
+    const FIELD_IDS = [
+      'inpPropertyTitle',
+      'inpTotalRentMan',
+      'inpWalkMin',
+      'inpBuildAge',
+      'inpFloorNum',
+      'inpMaxFloor',
+      'inpLayout',
+      'inpAreaSqm',
+      'inpStationLine'
+    ];
+
+    // =========================================================================
+    // 2. アプリ状態＆同期（4桁コード・IndexedDB・AI/手修正バッジ）
+    // =========================================================================
+    const state = {
       roomCode: '4829',
-      viewportMode: 'mobile', // 'mobile' | 'pc'
+      viewportMode: 'mobile',
       presenterMode: false,
-      workflowStep: 'eval', // 'eval' | 'viewing' | 'contract'
-      activeCategory: 'ALL',
-      mustHaves: {
+      workflowStep: 'eval',
+      selectedCategory: 'すべて',
+      mustHave: {
         rc: true,
-        ev: false,
+        ev: true,
         indoor_wash: true,
         separate_bt: true,
         rect_room: true,
-        deep_closet: false
+        deep_closet: true
       },
-      property: {
-        title: '清水駅 徒歩3分（大阪市旭区清水4丁目・1DK）',
-        totalRentMan: 3.3,
-        walkMin: 3,
-        buildAge: 58,
-        floorNum: 4,
-        maxFloor: 4,
-        layout: '1DK',
-        areaSqm: 23,
-        stationLine: '大阪メトロ今里筋線 清水駅',
-        stopType: 'local',
-        hubType: 'single',
-        corridorVibe: 'shitamachi_flat'
-      },
+      fieldSources: {}, // 'ai' | 'manual' | 'preset'
       criteria: JSON.parse(JSON.stringify(DEFAULT_CRITERIA)),
+      savedProperties: [],
       viewingChecked: {},
       contractChecked: {},
-      savedList: []
+      currentImageDataUrl: '',
+      currentImageMime: 'image/jpeg',
+      currentImageName: 'maisoku.jpg',
+      compressionMeta: ''
     };
 
-    // 同一ブラウザ内の他タブ（スマホ枠タブとPC商談タブ）とリアルタイム同期するチャネル
-    let syncChannel = null;
-    try {
-      if ('BroadcastChannel' in window) {
-        syncChannel = new BroadcastChannel('studiocalx_rental_sync_channel');
-        syncChannel.onmessage = (event) => {
-          const msg = event.data;
-          if (msg && msg.roomCode === state.roomCode && msg.payload) {
-            state = {
-              ...state,
-              ...msg.payload,
-              viewportMode: state.viewportMode, // 表示モードは各画面のものを維持
-              presenterMode: state.presenterMode
-            };
-            renderAll(true);
+    let broadcastChannel = null;
+    let idbPromise = null;
+
+    // IndexedDB（案件別・画像フォルダ保存用）
+    function openPhotoDb() {
+      if (idbPromise) return idbPromise;
+      idbPromise = new Promise((resolve, reject) => {
+        if (!('indexedDB' in window)) {
+          resolve(null);
+          return;
+        }
+        const req = indexedDB.open('studioCALX_MaisokuDB_v1', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('folders')) {
+            const store = db.createObjectStore('folders', { keyPath: 'id', autoIncrement: true });
+            store.createIndex('folderName', 'folderName', { unique: false });
           }
         };
-      }
-    } catch (e) {}
-
-    // =========================================================================
-    // 2. 初期化・ルーム同期・永続化
-    // =========================================================================
-    window.addEventListener('DOMContentLoaded', () => {
-      loadFromRoomStorage('4829');
-      renderAll(true);
-    });
-
-    function getStorageKey(code) {
-      return `studiocalx_rental_v2_room_${code}`;
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      return idbPromise;
     }
 
-    function saveToRoomStorage(skipBroadcast = false) {
-      try {
-        const cleanCode = sanitizeRoomCode(state.roomCode);
-        localStorage.setItem(getStorageKey(cleanCode), JSON.stringify(state));
-        if (!skipBroadcast && syncChannel) {
-          syncChannel.postMessage({ roomCode: cleanCode, payload: state });
-        }
-      } catch (e) {}
-    }
-
-    function loadFromRoomStorage(code) {
-      const cleanCode = sanitizeRoomCode(code);
-      state.roomCode = cleanCode;
-      document.getElementById('roomCodeInput').value = cleanCode;
-      try {
-        const raw = localStorage.getItem(getStorageKey(cleanCode));
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          state = {
-            ...state,
-            ...parsed,
-            roomCode: cleanCode,
-            mustHaves: { ...state.mustHaves, ...(parsed.mustHaves || {}) },
-            property: { ...state.property, ...(parsed.property || {}) },
-            criteria: Array.isArray(parsed.criteria) && parsed.criteria.length > 0 ? parsed.criteria : JSON.parse(JSON.stringify(DEFAULT_CRITERIA))
-          };
-        }
-      } catch (e) {}
-    }
-
-    function sanitizeRoomCode(val) {
-      const digits = String(val || '').replace(/\D/g, '').slice(0, 4);
-      return digits.length === 4 ? digits : '4829';
-    }
-
-    function connectRoomCode() {
-      const raw = document.getElementById('roomCodeInput').value;
-      const digits = String(raw || '').replace(/\D/g, '');
-      if (digits.length !== 4) {
-        showToast('4桁の半角数字を入力してください（例：4829）');
+    async function saveCurrentImageToFolder() {
+      if (!state.currentImageDataUrl) {
+        showToast('先にマイソク画像を撮影または読み込んでください。');
         return;
       }
-      loadFromRoomStorage(digits);
-      saveToRoomStorage();
-      renderAll(true);
-      showToast(`ルーム #${digits} に接続・同期しました`);
+      const rawFolder = (document.getElementById('folderNameInput').value || '').trim();
+      const propTitle = (document.getElementById('inpPropertyTitle').value || '').trim();
+      const folderName = rawFolder || propTitle || '未分類案件';
+
+      try {
+        const db = await openPhotoDb();
+        if (!db) {
+          showToast('このブラウザはIndexedDBに非対応のため「案件名付き保存」をご利用ください。');
+          return;
+        }
+        const record = {
+          folderName,
+          title: propTitle || folderName,
+          dataUrl: state.currentImageDataUrl,
+          savedAt: new Date().toLocaleString('ja-JP')
+        };
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction('folders', 'readwrite');
+          tx.objectStore('folders').add(record);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+        });
+        await renderFolderAlbum();
+        showToast(`フォルダ「${folderName}」へ画像を保存しました。`);
+      } catch {
+        showToast('フォルダ保存中にエラーが発生しました。');
+      }
     }
 
-    function randomizeRoomCode() {
-      const code = String(Math.floor(1000 + Math.random() * 9000));
-      document.getElementById('roomCodeInput').value = code;
-      state.roomCode = code;
-      saveToRoomStorage();
-      renderAll(true);
-      showToast(`新しい4桁コード #${code} を発行しました`);
+    async function deleteFolderPhoto(id) {
+      try {
+        const db = await openPhotoDb();
+        if (!db) return;
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction('folders', 'readwrite');
+          tx.objectStore('folders').delete(id);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+        });
+        await renderFolderAlbum();
+        showToast('保存画像を削除しました。');
+      } catch {
+        showToast('削除に失敗しました。');
+      }
+    }
+
+    async function loadFolderPhotoToActive(id) {
+      try {
+        const db = await openPhotoDb();
+        if (!db) return;
+        const item = await new Promise((resolve, reject) => {
+          const tx = db.transaction('folders', 'readonly');
+          const req = tx.objectStore('folders').get(id);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        if (!item || !item.dataUrl) return;
+        state.currentImageDataUrl = item.dataUrl;
+        state.currentImageMime = 'image/jpeg';
+        state.currentImageName = `${item.folderName || 'maisoku'}.jpg`;
+        document.getElementById('previewImageEl').src = item.dataUrl;
+        document.getElementById('imagePreviewBox').classList.remove('hidden');
+        showToast(`フォルダ「${item.folderName}」の画像を表示しました。`);
+      } catch {
+        showToast('画像の読み込みに失敗しました。');
+      }
+    }
+
+    async function renderFolderAlbum() {
+      const container = document.getElementById('folderAlbumContainer');
+      if (!container) return;
+      try {
+        const db = await openPhotoDb();
+        if (!db) return;
+        const items = await new Promise((resolve, reject) => {
+          const tx = db.transaction('folders', 'readonly');
+          const req = tx.objectStore('folders').getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => reject(req.error);
+        });
+        if (!items.length) {
+          container.innerHTML = '<span class="text-[10px] text-neutral-400">撮影・読込後に「フォルダ保存」を押すとここに案件別で残ります。</span>';
+          return;
+        }
+        const sorted = items.slice().reverse().slice(0, 12);
+        container.innerHTML = sorted.map((it) => `
+          <div class="shrink-0 w-32 bg-[#F8F8F6] border border-[#DCDCD6] rounded-xl p-1.5 space-y-1">
+            <div class="relative aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 cursor-pointer" onclick="loadFolderPhotoToActive(${it.id})">
+              <img src="${escapeHtml(it.dataUrl)}" alt="${escapeHtml(it.folderName)}" class="w-full h-full object-cover" />
+              <button type="button" onclick="event.stopPropagation(); deleteFolderPhoto(${it.id})"
+                class="absolute top-1 right-1 bg-black/75 text-white text-[9px] font-black px-1.5 py-0.5 rounded">×</button>
+            </div>
+            <div class="text-[10px] font-black text-[#111214] truncate" title="${escapeHtml(it.folderName)}">📁 ${escapeHtml(it.folderName)}</div>
+            <div class="text-[9px] text-neutral-400 truncate">${escapeHtml(it.savedAt || '')}</div>
+          </div>
+        `).join('');
+      } catch {
+        // サイレントフォールバック
+      }
+    }
+
+    function downloadCurrentImageWithName() {
+      if (!state.currentImageDataUrl) {
+        showToast('保存する画像がありません。');
+        return;
+      }
+      const now = new Date();
+      const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      const rawName = (document.getElementById('folderNameInput').value || document.getElementById('inpPropertyTitle').value || 'マイソク').trim();
+      const safeName = rawName.replace(/[\\/:*?"<>|]/g, '_').slice(0, 30) || 'マイソク';
+      const fileName = `${ymd}_${safeName}.jpg`;
+
+      const a = document.createElement('a');
+      a.href = state.currentImageDataUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast(`「${fileName}」としてダウンロードしました。`);
+    }
+
+    function openImageLightbox() {
+      if (!state.currentImageDataUrl) return;
+      document.getElementById('lightboxImageEl').src = state.currentImageDataUrl;
+      const title = (document.getElementById('inpPropertyTitle').value || 'マイソク原本').trim();
+      document.getElementById('lightboxCaption').textContent = `${title} ${state.compressionMeta ? '(' + state.compressionMeta + ')' : ''}`;
+      document.getElementById('imageLightbox').classList.remove('hidden');
+    }
+
+    function closeImageLightbox() {
+      document.getElementById('imageLightbox').classList.add('hidden');
+    }
+
+    function storageKeyForRoom(code) {
+      return `studioCALX_maisoku_v2_room_${code}`;
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      document.getElementById('toastMessage').textContent = msg;
+      box.classList.remove('hidden');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        box.classList.add('hidden');
+      }, 3400);
+    }
+
+    function hideToast() {
+      document.getElementById('toastBox').classList.add('hidden');
+    }
+
+    function openPwaModal() {
+      document.getElementById('pwaModal').classList.remove('hidden');
+    }
+
+    function closePwaModal() {
+      document.getElementById('pwaModal').classList.add('hidden');
     }
 
     // =========================================================================
-    // 3. サンプル物件プリセット（清水駅3.3万円 / 布施駅6.2万円）
+    // 3. AI読取 / 手修正バッジ管理 & 未読取クリア
+    // =========================================================================
+    function setFieldSource(fieldId, source) {
+      state.fieldSources[fieldId] = source;
+      renderFieldBadges();
+    }
+
+    function setAllFieldsSource(source) {
+      FIELD_IDS.forEach((id) => {
+        state.fieldSources[id] = source;
+      });
+      renderFieldBadges();
+    }
+
+    function renderFieldBadges() {
+      FIELD_IDS.forEach((id) => {
+        const badge = document.getElementById(`badge_${id}`);
+        if (!badge) return;
+        const src = state.fieldSources[id] || 'preset';
+        if (src === 'ai') {
+          badge.textContent = 'AI読取';
+          badge.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300';
+        } else if (src === 'manual') {
+          badge.textContent = '手修正済';
+          badge.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-[#E6FF00] text-[#111214] border border-neutral-800';
+        } else {
+          badge.textContent = '初期/手入力';
+          badge.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500';
+        }
+      });
+    }
+
+    function onFieldInput(fieldId) {
+      setFieldSource(fieldId, 'manual');
+      runFullEvaluation();
+    }
+
+    function clearSpecFieldsForNewScan() {
+      // 古い物件の値を残さないよう、一旦すべてクリア
+      document.getElementById('inpPropertyTitle').value = '';
+      document.getElementById('inpTotalRentMan').value = '';
+      document.getElementById('inpWalkMin').value = '';
+      document.getElementById('inpBuildAge').value = '';
+      document.getElementById('inpFloorNum').value = '';
+      document.getElementById('inpMaxFloor').value = '';
+      document.getElementById('inpLayout').value = '';
+      document.getElementById('inpAreaSqm').value = '';
+      document.getElementById('inpStationLine').value = '';
+      FIELD_IDS.forEach((id) => {
+        state.fieldSources[id] = 'preset';
+      });
+      renderFieldBadges();
+    }
+
+    // =========================================================================
+    // 4. サンプルプリセット（清水駅3.3万 / 布施駅6.2万）
     // =========================================================================
     function loadShimizuSample() {
-      state.property = {
-        title: '清水駅 徒歩3分（大阪市旭区清水4丁目・1DK・1968年築）',
-        totalRentMan: 3.3,
-        walkMin: 3,
-        buildAge: 58,
-        floorNum: 4,
-        maxFloor: 4,
-        layout: '1DK',
-        areaSqm: 23,
-        stationLine: '大阪メトロ今里筋線 清水駅',
-        stopType: 'local',
-        hubType: 'single',
-        corridorVibe: 'shitamachi_flat'
-      };
-      state.mustHaves = {
-        rc: true,
+      document.getElementById('inpPropertyTitle').value = '清水4丁目コーポ 202（下町・商店街至近）';
+      document.getElementById('inpTotalRentMan').value = '3.3';
+      document.getElementById('inpWalkMin').value = '3';
+      document.getElementById('inpBuildAge').value = '32';
+      document.getElementById('inpFloorNum').value = '2';
+      document.getElementById('inpMaxFloor').value = '3';
+      document.getElementById('inpLayout').value = '1K';
+      document.getElementById('inpAreaSqm').value = '21.5';
+      document.getElementById('inpStationLine').value = '京阪本線 清水駅';
+      document.getElementById('selStopType').value = 'local';
+      document.getElementById('selHubType').value = 'nearby';
+      document.getElementById('selCorridorVibe').value = 'shitamachi_flat';
+
+      state.mustHave = {
+        rc: false,
         ev: false,
         indoor_wash: true,
         separate_bt: true,
         rect_room: true,
         deep_closet: false
       };
-      const mapStatus = {
-        c_sun: 'good',
-        c_walk: 'good',
-        c_gas: 'good',
-        c_net: 'fair',
-        c_renewal: 'fair',
-        c_seismic: 'bad',
-        c_tile: 'fair',
-        a_ev_upper: 'bad'
-      };
-      state.criteria.forEach(item => {
-        if (mapStatus[item.id]) item.status = mapStatus[item.id];
+
+      state.criteria = JSON.parse(JSON.stringify(DEFAULT_CRITERIA)).map((item) => {
+        if (item.id === 'c_rent') return { ...item, status: 'good', weight: 3 };
+        if (item.id === 'c_walk') return { ...item, status: 'good', weight: 3 };
+        if (item.id === 'c_stop') return { ...item, status: 'fair' };
+        if (item.id === 'c_hub') return { ...item, status: 'good' };
+        if (item.id === 'c_super') return { ...item, status: 'good' };
+        if (item.id === 'c_slope') return { ...item, status: 'good' };
+        if (item.id === 'c_struct') return { ...item, status: 'fair' };
+        return item;
       });
-      renderAll();
-      showToast('「清水駅 徒歩3分 / 3.3万円」サンプルを読み込みました');
+
+      setAllFieldsSource('preset');
+      runFullEvaluation();
+      showToast('サンプル「清水駅3.3万」を読み込みました。');
     }
 
     function loadFuseSample() {
-      state.property = {
-        title: '布施駅 徒歩4分（1LDK 36㎡・急行停車・2路線ハブ・RC造EV付）',
-        totalRentMan: 6.2,
-        walkMin: 4,
-        buildAge: 14,
-        floorNum: 5,
-        maxFloor: 9,
-        layout: '1LDK',
-        areaSqm: 36,
-        stationLine: '近鉄大阪線・奈良線 布施駅',
-        stopType: 'express',
-        hubType: 'multi_hub',
-        corridorVibe: 'shitamachi_flat'
-      };
-      state.mustHaves = {
+      document.getElementById('inpPropertyTitle').value = 'レジデンス布施中央 701（2路線結節・急行停車）';
+      document.getElementById('inpTotalRentMan').value = '6.2';
+      document.getElementById('inpWalkMin').value = '5';
+      document.getElementById('inpBuildAge').value = '14';
+      document.getElementById('inpFloorNum').value = '7';
+      document.getElementById('inpMaxFloor').value = '10';
+      document.getElementById('inpLayout').value = '1LDK';
+      document.getElementById('inpAreaSqm').value = '38.0';
+      document.getElementById('inpStationLine').value = '近鉄奈良線・大阪線 布施駅';
+      document.getElementById('selStopType').value = 'express';
+      document.getElementById('selHubType').value = 'multi_hub';
+      document.getElementById('selCorridorVibe').value = 'urban_mixed';
+
+      state.mustHave = {
         rc: true,
         ev: true,
         indoor_wash: true,
@@ -785,539 +1022,662 @@
         rect_room: true,
         deep_closet: true
       };
-      state.criteria.forEach(item => {
-        if (['c_seismic', 'a_ev_upper', 'c_super', 'c_bike_park', 'c_slope', 'c_bath_gym', 'c_walk'].includes(item.id)) {
-          item.status = 'good';
-        }
+
+      state.criteria = JSON.parse(JSON.stringify(DEFAULT_CRITERIA)).map((item) => {
+        if (item.id === 'c_rent') return { ...item, status: 'fair', weight: 3 };
+        if (item.id === 'c_walk') return { ...item, status: 'good', weight: 3 };
+        if (item.id === 'c_stop') return { ...item, status: 'good' };
+        if (item.id === 'c_hub') return { ...item, status: 'good' };
+        if (item.id === 'c_struct') return { ...item, status: 'good' };
+        if (item.id === 'c_parcel') return { ...item, status: 'good' };
+        return item;
       });
-      renderAll();
-      showToast('「布施駅 徒歩4分 / 6.2万円（急行ハブ）」サンプルを読み込みました');
+
+      setAllFieldsSource('preset');
+      runFullEvaluation();
+      showToast('サンプル「布施駅6.2万」を読み込みました。');
     }
 
     // =========================================================================
-    // 4. 画像読込（カメラ・写真）＆スキャン演出
+    // 5. 高精細Canvas画像圧縮（長辺2400px・JPEG品質0.85）＆ 実機 /api/analyze 連携
     // =========================================================================
-    function handleFlyerImage(event) {
+    async function compressImageForOcr(file, maxDimension = 2400, quality = 0.85) {
+      const originalDataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = originalDataUrl;
+      });
+
+      const origW = img.naturalWidth || img.width;
+      const origH = img.naturalHeight || img.height;
+      const longest = Math.max(origW, origH);
+      const scale = longest > maxDimension ? maxDimension / longest : 1;
+
+      const targetW = Math.max(1, Math.round(origW * scale));
+      const targetH = Math.max(1, Math.round(origH * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, targetW, targetH);
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      const base64Only = compressedDataUrl.split(',')[1] || '';
+
+      const origKB = Math.round((file.size || 0) / 1024);
+      const compKB = Math.round((base64Only.length * 0.75) / 1024);
+
+      return {
+        previewUrl: compressedDataUrl,
+        base64: base64Only,
+        mimeType: 'image/jpeg',
+        metaText: `${origW}×${origH}→${targetW}×${targetH} / ${origKB}KB→約${compKB}KB (q=${quality})`
+      };
+    }
+
+    function applyOcrDataToForm(data) {
+      clearSpecFieldsForNewScan();
+      if (!data || typeof data !== 'object') return;
+
+      const setIfPresent = (inputId, val, formatter = (v) => String(v)) => {
+        if (val === null || val === undefined || val === '') return false;
+        const el = document.getElementById(inputId);
+        if (!el) return false;
+        el.value = formatter(val);
+        setFieldSource(inputId, 'ai');
+        return true;
+      };
+
+      const titleStr = [data.title, data.address].filter(Boolean).join(' / ');
+      setIfPresent('inpPropertyTitle', titleStr || data.title);
+
+      let totalMan = null;
+      const rentNum = Number(data.rent_yen);
+      const mgmtNum = Number(data.management_fee_yen);
+      if (!Number.isNaN(rentNum) && rentNum > 0) {
+        const sumYen = rentNum + (!Number.isNaN(mgmtNum) && mgmtNum > 0 ? mgmtNum : 0);
+        totalMan = Math.round((sumYen / 10000) * 100) / 100;
+      }
+      setIfPresent('inpTotalRentMan', totalMan);
+      setIfPresent('inpWalkMin', data.walk_minutes !== null && data.walk_minutes !== undefined ? Number(data.walk_minutes) : null);
+
+      if (data.built_year !== null && data.built_year !== undefined) {
+        const yr = Number(data.built_year);
+        if (!Number.isNaN(yr) && yr > 1900 && yr <= 2100) {
+          const age = Math.max(0, new Date().getFullYear() - yr);
+          setIfPresent('inpBuildAge', age);
+        }
+      }
+
+      setIfPresent('inpLayout', data.layout);
+      setIfPresent('inpAreaSqm', data.area_sqm !== null && data.area_sqm !== undefined ? Number(data.area_sqm) : null);
+      setIfPresent('inpStationLine', data.station);
+
+      const notesEl = document.getElementById('ocrNotesText');
+      const noteParts = [];
+      if (data.deposit) noteParts.push(`敷金: ${data.deposit}`);
+      if (data.key_money) noteParts.push(`礼金: ${data.key_money}`);
+      if (data.structure) noteParts.push(`構造: ${data.structure}`);
+      if (data.notes) noteParts.push(`備考: ${data.notes}`);
+      if (data.confidence_note) noteParts.push(`読取補足: ${data.confidence_note}`);
+
+      if (noteParts.length > 0 && notesEl) {
+        notesEl.textContent = noteParts.join(' ｜ ');
+        notesEl.classList.remove('hidden');
+      } else if (notesEl) {
+        notesEl.textContent = '';
+        notesEl.classList.add('hidden');
+      }
+    }
+
+    async function handleFlyerImage(event) {
       const file = event.target.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        document.getElementById('previewImageEl').src = e.target.result;
-        document.getElementById('imagePreviewBox').classList.remove('hidden');
-        document.getElementById('scanOverlay').classList.remove('hidden');
 
-        setTimeout(() => {
-          document.getElementById('scanOverlay').classList.add('hidden');
-          runFullEvaluation();
-          showToast('チラシ画像を読み込みました。必要に応じて数値を微調整して採点できます');
-        }, 850);
-      };
-      reader.readAsDataURL(file);
+      const previewBox = document.getElementById('imagePreviewBox');
+      const previewEl = document.getElementById('previewImageEl');
+      const scanOverlay = document.getElementById('scanOverlay');
+      const banner = document.getElementById('ocrStatusBanner');
+      const statusText = document.getElementById('ocrStatusText');
+      const metaTextEl = document.getElementById('ocrCompressionMeta');
+
+      previewBox.classList.remove('hidden');
+      scanOverlay.classList.remove('hidden');
+      banner.classList.remove('hidden');
+      statusText.textContent = '高精細リサイズ（長辺2400px・品質0.85）中...';
+
+      try {
+        const compressed = await compressImageForOcr(file, 2400, 0.85);
+        state.currentImageDataUrl = compressed.previewUrl;
+        state.currentImageMime = compressed.mimeType;
+        state.currentImageName = file.name || 'maisoku.jpg';
+        state.compressionMeta = compressed.metaText;
+
+        previewEl.src = compressed.previewUrl;
+        metaTextEl.textContent = compressed.metaText;
+        statusText.textContent = 'AI（/api/analyze）へ送信してマイソク解析中...';
+
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: compressed.base64,
+            mimeType: compressed.mimeType
+          })
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload?.ok) {
+          const errMsg = payload?.error || `解析エラー（HTTP ${res.status}）`;
+          statusText.textContent = `解析失敗: ${errMsg}`;
+          showToast(errMsg);
+          return;
+        }
+
+        applyOcrDataToForm(payload.data);
+        runFullEvaluation();
+        statusText.textContent = `読取完了（モデル: ${payload.model || 'Gemini'}）— 未読取欄や数値を原本と照合してください`;
+        showToast('マイソクのAI解析が完了しました。未読取項目・数値をご確認ください。');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '画像処理または通信に失敗しました。';
+        statusText.textContent = `エラー: ${msg}`;
+        showToast(msg);
+      } finally {
+        scanOverlay.classList.add('hidden');
+        event.target.value = '';
+      }
     }
 
     function clearFlyerImage() {
-      document.getElementById('flyerCameraInput').value = '';
-      document.getElementById('flyerFileInput').value = '';
-      document.getElementById('previewImageEl').src = '';
+      state.currentImageDataUrl = '';
+      state.compressionMeta = '';
       document.getElementById('imagePreviewBox').classList.add('hidden');
+      document.getElementById('previewImageEl').src = '';
+      document.getElementById('ocrStatusBanner').classList.add('hidden');
+      document.getElementById('ocrNotesText').classList.add('hidden');
     }
 
     // =========================================================================
-    // 5. 必須6項目トグル・沿線判定・スマート推察エンジン
+    // 6. 評価エンジン・沿線判定・スマート推察・比較・チェックリスト
     // =========================================================================
-    function renderMustHaveChips() {
-      const container = document.getElementById('mustHaveChipsContainer');
-      let passedCount = 0;
-      container.innerHTML = MUST_HAVE_DEFS.map(def => {
-        const active = !!state.mustHaves[def.id];
-        if (active) passedCount++;
-        return `
-          <button type="button" onclick="toggleMustHave('${def.id}')"
-            class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${active ? 'bg-[#111214] text-[#E6FF00] border-[#111214]' : 'bg-white text-neutral-500 border-[#DCDCD6]'}">
-            ${active ? '✓' : '−'} ${def.label}
-          </button>
-        `;
-      }).join('');
-      const badge = document.getElementById('mustHaveSummaryBadge');
-      badge.textContent = `基本条件 ${passedCount}/6 充足`;
-      badge.className = `text-[10px] font-black px-2 py-0.5 rounded ${passedCount === 6 ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`;
-    }
-
-    function toggleMustHave(id) {
-      state.mustHaves[id] = !state.mustHaves[id];
-      renderMustHaveChips();
-      runFullEvaluation();
-    }
-
-    function evaluateRailNetwork(prop) {
-      let stopPoints = 4;
-      let stopLabel = '普通（各駅停車）';
-      if (prop.stopType === 'express') {
-        stopPoints = 12;
-        stopLabel = '急行・特急・新快速停車';
-      } else if (prop.stopType === 'semi_express') {
-        stopPoints = 8;
-        stopLabel = '準急・区間急行・快速停車';
-      }
-
-      let hubPoints = 2;
-      let hubLabel = '単一路線のみ';
-      if (prop.hubType === 'multi_hub') {
-        hubPoints = 10;
-        hubLabel = '2路線以上交差（ハブ駅）';
-      } else if (prop.hubType === 'nearby') {
-        hubPoints = 6;
-        hubLabel = '近接に別路線あり';
-      }
-
-      let vibePoints = 6;
-      let vibeLabel = '下町・商店街・平地◎';
-      if (prop.corridorVibe === 'urban_mixed') {
-        vibePoints = 5;
-        vibeLabel = '市街地・利便性○';
-      } else if (prop.corridorVibe === 'hill_quiet') {
-        vibePoints = 2;
-        vibeLabel = '坂道・郊外/静穏△';
-      }
-
-      const walkBonus = prop.walkMin <= 5 ? 3 : prop.walkMin <= 10 ? 1 : -2;
-      const totalRailScore = Math.max(0, Math.min(30, stopPoints + hubPoints + vibePoints + walkBonus));
-
+    function getSpecValues() {
+      const parseNumOrNull = (id) => {
+        const raw = document.getElementById(id)?.value;
+        if (raw === '' || raw === null || raw === undefined) return null;
+        const n = Number(raw);
+        return Number.isNaN(n) ? null : n;
+      };
       return {
-        totalRailScore,
-        stopLabel,
-        summary: `${prop.stationLine || '最寄駅'}（徒歩${prop.walkMin}分）／種別：${stopLabel}／路線性：${hubLabel}／街並み：${vibeLabel}`
+        title: (document.getElementById('inpPropertyTitle')?.value || '').trim() || '（物件名未入力）',
+        totalRentMan: parseNumOrNull('inpTotalRentMan'),
+        walkMin: parseNumOrNull('inpWalkMin'),
+        buildAge: parseNumOrNull('inpBuildAge'),
+        floorNum: parseNumOrNull('inpFloorNum'),
+        maxFloor: parseNumOrNull('inpMaxFloor'),
+        layout: (document.getElementById('inpLayout')?.value || '').trim() || '未読取',
+        areaSqm: parseNumOrNull('inpAreaSqm'),
+        stationLine: (document.getElementById('inpStationLine')?.value || '').trim() || '最寄駅未読取',
+        stopType: document.getElementById('selStopType')?.value || 'local',
+        hubType: document.getElementById('selHubType')?.value || 'single',
+        corridorVibe: document.getElementById('selCorridorVibe')?.value || 'shitamachi_flat'
       };
     }
 
-    function generateSmartInferences(prop) {
-      const inferences = [];
+    function computeRailScore(spec) {
+      let score = 50;
+      if (spec.stopType === 'express') score += 22;
+      else if (spec.stopType === 'semi_express') score += 12;
 
-      // 1. エレベーター推察（建築基準法31mルール・築古低中層）
-      if (!state.mustHaves.ev && prop.buildAge >= 25 && prop.maxFloor <= 6) {
-        const isUpperNoEv = prop.floorNum >= 3;
-        inferences.push({
-          tag: isUpperNoEv ? 'EVなし濃厚・階段注意' : '設備推察',
-          badgeClass: isUpperNoEv ? 'bg-amber-200 text-amber-950' : 'bg-amber-100 text-amber-900',
-          title: `エレベーター：${prop.maxFloor}階建・築${prop.buildAge}年のため未設置の可能性が高い（建築基準法31mルール推察）`,
-          talk: `「${prop.maxFloor}階建の築年数なので階段物件かと思いますが、エレベーターの有無だけ教えていただけますか？」と確認できます。`
-        });
+      if (spec.hubType === 'multi_hub') score += 20;
+      else if (spec.hubType === 'nearby') score += 10;
+
+      if (spec.corridorVibe === 'shitamachi_flat') score += 12;
+      else if (spec.corridorVibe === 'urban_mixed') score += 8;
+
+      if (spec.walkMin !== null) {
+        if (spec.walkMin <= 5) score += 8;
+        else if (spec.walkMin <= 10) score += 3;
+        else if (spec.walkMin > 15) score -= 10;
       }
-
-      // 2. 耐震基準推察（1981年6月以前＝築45年以上）
-      if (prop.buildAge >= 45) {
-        inferences.push({
-          tag: '旧耐震ゾーン',
-          badgeClass: 'bg-amber-100 text-amber-900',
-          title: '耐震基準：1981年以前の旧耐震基準に該当する可能性',
-          talk: '「室内のリフォーム状態が良さそうですね。建物は旧耐震の世代かと思いますが、耐震補強や配管更新の履歴はありますか？」と自然に話題にできます。'
-        });
-      }
-
-      // 3. 収納奥行き・広さ推察
-      if (prop.areaSqm > 0 && prop.areaSqm <= 26) {
-        inferences.push({
-          tag: '面積推察',
-          badgeClass: 'bg-sky-100 text-sky-900',
-          title: `収納・居室バランス：${prop.areaSqm}㎡（${prop.layout}）のため収納は標準〜やや浅め想定`,
-          talk: '「面積的に収納は標準サイズかと思いますが、奥行きの深さやデスク配置の余白だけ内見で見させてください。」'
-        });
-      }
-
-      // 4. ネット方式＆楽天モバイル電波推察
-      if (prop.buildAge >= 20) {
-        inferences.push({
-          tag: '通信・電波推察',
-          badgeClass: 'bg-neutral-200 text-neutral-800',
-          title: '通信環境：建物内VDSL方式の可能性＆RC壁による電波減衰に注意',
-          talk: '「光対応表記でも建物内はVDSL方式のケースがあるため、現地で楽天モバイルのテザリング電波もあわせて確認しますね。」'
-        });
-      }
-
-      if (inferences.length === 0) {
-        inferences.push({
-          tag: 'バランス良好',
-          badgeClass: 'bg-emerald-100 text-emerald-900',
-          title: '基本スペック充足：日当たり・騒音・契約条件の最終すり合わせ段階',
-          talk: '「条件の適合度が高いので、あとは日当たり・周辺音・更新料や解約条件の詳細を確認できれば前向きに検討したいです。」'
-        });
-      }
-
-      return inferences;
+      return Math.max(0, Math.min(100, score));
     }
 
-    // =========================================================================
-    // 6. 総合スコア計算・レンダリング
-    // =========================================================================
-    function syncInputsToProperty() {
-      state.property.title = document.getElementById('inpPropertyTitle').value;
-      state.property.totalRentMan = parseFloat(document.getElementById('inpTotalRentMan').value) || 0;
-      state.property.walkMin = parseInt(document.getElementById('inpWalkMin').value, 10) || 1;
-      state.property.buildAge = parseInt(document.getElementById('inpBuildAge').value, 10) || 0;
-      state.property.floorNum = parseInt(document.getElementById('inpFloorNum').value, 10) || 1;
-      state.property.maxFloor = parseInt(document.getElementById('inpMaxFloor').value, 10) || 1;
-      state.property.layout = document.getElementById('inpLayout').value;
-      state.property.areaSqm = parseFloat(document.getElementById('inpAreaSqm').value) || 0;
-      state.property.stationLine = document.getElementById('inpStationLine').value;
-      state.property.stopType = document.getElementById('selStopType').value;
-      state.property.hubType = document.getElementById('selHubType').value;
-      state.property.corridorVibe = document.getElementById('selCorridorVibe').value;
-    }
+    function runFullEvaluation() {
+      const spec = getSpecValues();
+      const railScore = computeRailScore(spec);
 
-    function runFullEvaluation(skipBroadcast = false) {
-      syncInputsToProperty();
-      const prop = state.property;
+      // 必須6項目バッジ＆チップ
+      const mustTrueCount = MUST_HAVE_DEFS.filter((d) => !!state.mustHave[d.id]).length;
+      const mustBadge = document.getElementById('mustHaveSummaryBadge');
+      if (mustBadge) {
+        mustBadge.textContent = `${mustTrueCount} / ${MUST_HAVE_DEFS.length} 充足`;
+      }
+      renderMustHaveChips();
 
-      // 沿線・種別・路線ハブ評価（最大30点）
-      const rail = evaluateRailNetwork(prop);
-      document.getElementById('railScoreBadge').textContent = `路線点: ${rail.totalRailScore}/30`;
-      document.getElementById('railAnalysisSummary').textContent = rail.summary;
+      // 沿線・種別・路線ハブ表示
+      const stopLabelMap = {
+        local: '普通停車',
+        semi_express: '準急・快速系',
+        express: '急行・特急系'
+      };
+      const hubLabelMap = {
+        single: '単一路線',
+        nearby: '近隣別路線あり',
+        multi_hub: '複数路線ハブ'
+      };
+      const vibeLabelMap = {
+        shitamachi_flat: '下町・商店街・平地◎',
+        urban_mixed: '市街地・利便性○',
+        hill_quiet: '坂道・郊外/静穏△'
+      };
 
-      // ミニマップ＆外部Googleマップリンク更新
-      document.getElementById('miniMapPropertyLabel').textContent = prop.title.slice(0, 14);
-      document.getElementById('miniMapStopBadge').textContent = rail.stopLabel.split('（')[0];
-      document.getElementById('pinStationText').textContent = `${prop.stationLine.split(' ').pop() || '最寄駅'}(${prop.walkMin}分)`;
-      const mapQuery = encodeURIComponent(`${prop.stationLine} ${prop.title}`);
+      document.getElementById('railScoreBadge').textContent = `路線点: ${railScore}`;
+      document.getElementById('miniMapStopBadge').textContent = stopLabelMap[spec.stopType] || '普通停車';
+      document.getElementById('miniMapPropertyLabel').textContent = spec.title.slice(0, 18);
+      document.getElementById('pinStationText').textContent = `${spec.stationLine.slice(0, 10)}(${spec.walkMin ?? '?'}分)`;
+
+      const mapQuery = encodeURIComponent(`${spec.stationLine} ${spec.title}`);
       document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
 
-      // カスタム項目の重み付けスコア（最大70点相当に換算）
-      let earnedWeighted = 0;
+      document.getElementById('railAnalysisSummary').innerHTML =
+        `<strong>${escapeHtml(spec.stationLine)}</strong>（徒歩${spec.walkMin !== null ? spec.walkMin + '分' : '未読取'}）：` +
+        `${stopLabelMap[spec.stopType]} × ${hubLabelMap[spec.hubType]} × ${vibeLabelMap[spec.corridorVibe]}。` +
+        (spec.stopType === 'local' && spec.hubType === 'multi_hub'
+          ? '各駅停車でも複数路線結節点に近いため、迂回ルートや乗換選択肢を確保しやすい立地です。'
+          : spec.stopType === 'express'
+            ? '上位種別停車により主要ターミナルへの移動効率が高く、時間価値に優れます。'
+            : '徒歩分数と周辺生活導線（スーパー・駐輪・平坦性）のバランスを現地で確認してください。');
+
+      // 総合スコア算出
+      let totalWeighted = 0;
       let maxWeighted = 0;
-      let alignmentItems = [];
+      const alignmentPoints = [];
 
-      state.criteria.forEach(item => {
-        const w = Number(item.weight) || 1;
+      state.criteria.forEach((c) => {
+        const w = Number(c.weight) || 1;
         maxWeighted += w * 2;
-        if (item.status === 'good') {
-          earnedWeighted += w * 2;
-        } else if (item.status === 'fair') {
-          earnedWeighted += w * 1;
-        } else if (item.status === 'bad') {
-          if (item.isAlignmentPoint) {
-            alignmentItems.push(item.name);
-          }
+        if (c.status === 'good') totalWeighted += w * 2;
+        else if (c.status === 'fair') totalWeighted += w * 1;
+
+        if (c.status === 'poor' || c.isAlignmentPoint) {
+          alignmentPoints.push(`${c.name}（${c.status === 'poor' ? '要改善/注意' : '条件確認'}）`);
         }
       });
 
-      // 基本必須条件の未充足項目を要確認ポイントへ自動連携
-      MUST_HAVE_DEFS.forEach(def => {
-        if (!state.mustHaves[def.id]) {
-          alignmentItems.push(`基本希望条件「${def.label}」の適合状況・代替可否`);
-        }
-      });
+      const mustBonus = Math.round((mustTrueCount / MUST_HAVE_DEFS.length) * 10);
+      const rawPct = maxWeighted > 0 ? Math.round((totalWeighted / maxWeighted) * 90) : 0;
+      const totalScore = Math.max(0, Math.min(100, rawPct + mustBonus));
 
-      const criteriaScore70 = maxWeighted > 0 ? Math.round((earnedWeighted / maxWeighted) * 70) : 35;
-      const alignmentPenalty = Math.min(24, alignmentItems.length * 4);
-      const finalScore = Math.max(0, Math.min(100, rail.totalRailScore + criteriaScore70 - alignmentPenalty));
+      document.getElementById('evalTitleDisplay').textContent = spec.title;
+      document.getElementById('totalScoreNum').textContent = String(totalScore);
 
-      document.getElementById('evalTitleDisplay').textContent = prop.title || '名称未設定物件';
-      document.getElementById('totalScoreNum').textContent = finalScore;
+      const rankPill = document.getElementById('rankPill');
+      const verdictText = document.getElementById('evalVerdictText');
+      const rentStr = spec.totalRentMan !== null ? `${spec.totalRentMan}万円` : '賃料未読取';
+      const ageStr = spec.buildAge !== null ? `築${spec.buildAge}年` : '築年数未読取';
+      const areaStr = spec.areaSqm !== null ? `${spec.areaSqm}㎡` : '面積未読取';
 
-      let rankText = 'B: 条件次第で検討';
-      let rankClass = 'bg-amber-400 text-neutral-950';
-      let verdict = '主要条件と沿線バランスを確認しながら、内見・契約条件をすり合わせるフェーズです。';
-
-      if (finalScore >= 80) {
-        rankText = 'A: 有力・前向き検討';
-        rankClass = 'bg-[#E6FF00] text-[#111214]';
-        verdict = '条件適合度が高く、他候補と比較しても非常に有力なラインです。';
-      } else if (finalScore >= 60) {
-        rankText = 'B: 条件次第で検討';
-        rankClass = 'bg-emerald-400 text-neutral-950';
-        verdict = '強みはあるものの、築年数・路線種別・契約条件のバランスを見極めたい物件です。';
+      if (totalScore >= 75) {
+        rankPill.textContent = 'Aランク / 有力';
+        rankPill.className = 'mt-1 text-[10px] font-black px-2 py-0.5 rounded bg-emerald-400 text-neutral-950';
+        verdictText.textContent = `${rentStr}・${spec.layout}（${areaStr}・${ageStr}）。条件適合度が高く、内見・条件すり合わせを進める有力候補です。`;
+      } else if (totalScore >= 55) {
+        rankPill.textContent = 'Bランク / 精査';
+        rankPill.className = 'mt-1 text-[10px] font-black px-2 py-0.5 rounded bg-[#E6FF00] text-neutral-950';
+        verdictText.textContent = `${rentStr}・${spec.layout}（${areaStr}・${ageStr}）。強みと確認事項が混在しているため、現地内見と諸条件の突合が重要です。`;
       } else {
-        rankText = 'C: 条件すり合わせ要';
-        rankClass = 'bg-amber-400 text-neutral-950';
-        verdict = '要確認ポイントが多めです。優先条件との折り合いや代替候補との比較を推奨します。';
+        rankPill.textContent = 'Cランク / 要調整';
+        rankPill.className = 'mt-1 text-[10px] font-black px-2 py-0.5 rounded bg-amber-400 text-neutral-950';
+        verdictText.textContent = `${rentStr}・${spec.layout}（${areaStr}・${ageStr}）。未充足または要確認の要素が多いため、条件交渉や代替物件との比較を推奨します。`;
       }
 
-      // 不動産屋提示モード vs 自分用モードの切替
-      const presenterBox = document.getElementById('presenterSummaryBox');
-      if (state.presenterMode) {
-        presenterBox.classList.remove('hidden');
-        document.getElementById('evalVerdictText').textContent = `希望条件マトリクス適合スコア：${finalScore}点（${rankText}）`;
-        const topNeeds = alignmentItems.slice(0, 2).join('／') || '契約詳細・現地環境';
-        document.getElementById('presenterTargetText').textContent =
-          `沿線評価（${rail.totalRailScore}/30点）と立地条件は魅力的です。「${topNeeds}」の条件が合致すれば、さらに前向きに検討可能です。`;
-      } else {
-        presenterBox.classList.add('hidden');
-        document.getElementById('evalVerdictText').textContent = verdict;
-      }
-
-      const pill = document.getElementById('rankPill');
-      pill.textContent = rankText;
-      pill.className = `mt-1 text-[10px] font-black px-2 py-0.5 rounded ${rankClass}`;
+      document.getElementById('presenterTargetText').textContent =
+        `対象：${spec.title}（${rentStr} / ${spec.layout} / ${ageStr} / 徒歩${spec.walkMin !== null ? spec.walkMin + '分' : '未読取'}）。` +
+        `基本条件 ${mustTrueCount}/${MUST_HAVE_DEFS.length} 項目充足、総合スコア ${totalScore} 点。`;
 
       // 要確認ポイント描画
-      document.getElementById('alignmentCountBadge').textContent = `${alignmentItems.length}件`;
-      const alignListEl = document.getElementById('alignmentAlertList');
-      if (alignmentItems.length === 0) {
-        alignListEl.innerHTML = '<li class="text-emerald-300">・現在の設定では優先すり合わせ事項はすべてクリアしています。</li>';
+      const alertList = document.getElementById('alignmentAlertList');
+      const alertBadge = document.getElementById('alignmentCountBadge');
+      alertBadge.textContent = `${alignmentPoints.length}件`;
+      if (alignmentPoints.length === 0) {
+        alertList.innerHTML = '<li class="text-emerald-200">現在、重大な要注意フラグはありません。契約書・重説の細部のみご確認ください。</li>';
       } else {
-        alignListEl.innerHTML = alignmentItems.map(a => `<li>・${escapeHtml(a)}</li>`).join('');
+        alertList.innerHTML = alignmentPoints.slice(0, 6).map((pt) => `<li>・${escapeHtml(pt)}</li>`).join('');
       }
 
-      // スマート推察描画（提示モード時は内部会話メモを非表示にして要旨のみ表示）
-      const inferences = generateSmartInferences(prop);
-      document.getElementById('smartInferenceList').innerHTML = inferences.map(inf => `
-        <div class="border border-neutral-200 rounded-xl p-2.5 bg-[#FAFAF8] space-y-1">
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-[10px] font-black px-2 py-0.5 rounded ${inf.badgeClass}">${escapeHtml(inf.tag)}</span>
-            <span class="text-xs font-black text-[#111214]">${escapeHtml(inf.title)}</span>
-          </div>
-          ${state.presenterMode ? '' : `<p class="text-[11px] text-neutral-600 leading-relaxed">${escapeHtml(inf.talk)}</p>`}
-        </div>
-      `).join('');
-
-      saveToRoomStorage(skipBroadcast);
+      renderSmartInference(spec);
+      renderCategoryFilterChips();
+      renderCriteriaList();
+      saveRoomState();
+      broadcastState();
     }
 
-    // =========================================================================
-    // 7. カスタム評価項目（追加・削除・状態切替・重み調整）
-    // =========================================================================
-    function renderCategoryChips() {
-      const cats = ['ALL', '住戸の状態', '生活導線', 'アクセス', 'ランニングコスト', '建物・管理', '要確認ポイント'];
-      const container = document.getElementById('categoryFilterChips');
-      container.innerHTML = cats.map(cat => {
-        const active = state.activeCategory === cat;
-        const label = cat === 'ALL' ? 'すべて' : cat;
-        return `<button onclick="setActiveCategory('${cat}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold border transition ${active ? 'bg-[#111214] text-[#E6FF00] border-[#111214]' : 'bg-white text-neutral-600 border-[#DCDCD6] hover:bg-neutral-50'}">${label}</button>`;
+    function renderMustHaveChips() {
+      const container = document.getElementById('mustHaveChipsContainer');
+      if (!container) return;
+      container.innerHTML = MUST_HAVE_DEFS.map((d) => {
+        const active = !!state.mustHave[d.id];
+        const cls = active
+          ? 'bg-[#111214] text-[#E6FF00] border-[#111214]'
+          : 'bg-neutral-100 text-neutral-500 border-[#DCDCD6]';
+        return `<button type="button" onclick="toggleMustHave('${d.id}')" class="px-2.5 py-1 rounded-lg text-[11px] font-black border ${cls}">
+          ${active ? '✓ ' : '・ '}${escapeHtml(d.label)}
+        </button>`;
       }).join('');
     }
 
-    function setActiveCategory(cat) {
-      state.activeCategory = cat;
-      renderCategoryChips();
+    function toggleMustHave(id) {
+      state.mustHave[id] = !state.mustHave[id];
+      runFullEvaluation();
+    }
+
+    function renderSmartInference(spec) {
+      const container = document.getElementById('smartInferenceList');
+      if (!container) return;
+      const cards = [];
+
+      if (spec.buildAge !== null && spec.buildAge >= 25) {
+        cards.push({
+          tag: '築年数推察',
+          text: `築${spec.buildAge}年のため、給湯器・エアコン年式や水回り設備の更新履歴、管理規約・修繕状況の確認が有効です。`,
+          hook: '「設備の交換時期や、直近でリフォームされた箇所があれば教えてください」'
+        });
+      }
+      if (spec.floorNum !== null && spec.maxFloor !== null && spec.floorNum === spec.maxFloor && spec.maxFloor >= 3) {
+        cards.push({
+          tag: '最上階推察',
+          text: `${spec.maxFloor}階建の最上階のため、上階足音リスクが低い一方、屋根からの夏場の日射熱や断熱性能を確認すると安心です。`,
+          hook: '「最上階とのことですが、夏場の室温や天井断熱の仕様はいかがですか？」'
+        });
+      }
+      if (spec.totalRentMan !== null && spec.areaSqm !== null && spec.areaSqm > 0) {
+        const tsubo = spec.areaSqm / 3.30578;
+        const tsuboRent = Math.round((spec.totalRentMan * 10000) / tsubo);
+        cards.push({
+          tag: '坪単価目安',
+          text: `約${tsubo.toFixed(1)}坪換算で坪単価目安は約${tsuboRent.toLocaleString()}円です。管理費込みの総額バランスを周辺相場と比較できます。`,
+          hook: '「管理費や駐輪場代を含めた月々の実質総額を教えていただけますか？」'
+        });
+      }
+      if (cards.length === 0) {
+        cards.push({
+          tag: '基本確認',
+          text: '賃料・築年数・階数・面積を入力またはマイソク読取を行うと、条件に応じた確認ポイントと会話のきっかけを表示します。',
+          hook: '「募集図面に記載のない設備条件や、現況と異なる点があれば教えてください」'
+        });
+      }
+
+      container.innerHTML = cards.map((c) => `
+        <div class="bg-[#F8F8F6] border border-[#DCDCD6] rounded-xl p-2.5 space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black bg-[#111214] text-[#E6FF00] px-2 py-0.5 rounded">${escapeHtml(c.tag)}</span>
+          </div>
+          <p class="text-xs text-neutral-700 leading-relaxed">${escapeHtml(c.text)}</p>
+          <p class="text-[11px] font-bold text-neutral-900 bg-white border border-neutral-200 rounded-lg px-2 py-1">💬 ${escapeHtml(c.hook)}</p>
+        </div>
+      `).join('');
+    }
+
+    function renderCategoryFilterChips() {
+      const container = document.getElementById('categoryFilterChips');
+      if (!container) return;
+      const categories = ['すべて', ...Array.from(new Set(state.criteria.map((c) => c.category)))];
+      container.innerHTML = categories.map((cat) => {
+        const active = state.selectedCategory === cat;
+        const cls = active
+          ? 'bg-[#111214] text-[#E6FF00] border-[#111214]'
+          : 'bg-neutral-100 text-neutral-700 border-[#DCDCD6] hover:bg-neutral-200';
+        return `<button type="button" onclick="selectCategory('${escapeHtml(cat)}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold border ${cls}">${escapeHtml(cat)}</button>`;
+      }).join('');
+    }
+
+    function selectCategory(cat) {
+      state.selectedCategory = cat;
+      renderCategoryFilterChips();
       renderCriteriaList();
     }
 
     function renderCriteriaList() {
       const container = document.getElementById('criteriaListContainer');
-      const filtered = state.activeCategory === 'ALL'
+      if (!container) return;
+      const filtered = state.selectedCategory === 'すべて'
         ? state.criteria
-        : state.criteria.filter(c => c.category === state.activeCategory);
+        : state.criteria.filter((c) => c.category === state.selectedCategory);
 
-      if (filtered.length === 0) {
-        container.innerHTML = '<p class="text-xs text-neutral-400 text-center py-4">このカテゴリの項目はありません。</p>';
-        return;
+      container.innerHTML = filtered.map((item) => {
+        const statusBtn = (st, label, activeCls) => {
+          const isAct = item.status === st;
+          const cls = isAct ? activeCls : 'bg-white text-neutral-400 border-[#DCDCD6] hover:text-neutral-700';
+          return `<button type="button" onclick="setCriterionStatus('${item.id}', '${st}')" class="w-7 h-7 rounded-lg text-xs font-black border ${cls}">${label}</button>`;
+        };
+        return `
+          <div class="bg-[#F8F8F6] border border-[#DCDCD6] rounded-xl p-2.5 flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[9px] font-black bg-white border border-[#DCDCD6] text-neutral-600 px-1.5 py-0.5 rounded">${escapeHtml(item.category)}</span>
+                <span class="text-[10px] font-bold text-neutral-500">重み x${item.weight}</span>
+              </div>
+              <div class="text-xs font-bold text-[#111214] mt-1 leading-snug">${escapeHtml(item.name)}</div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              ${statusBtn('good', '〇', 'bg-emerald-500 text-white border-emerald-600')}
+              ${statusBtn('fair', '△', 'bg-amber-400 text-neutral-950 border-amber-500')}
+              ${statusBtn('poor', '×', 'bg-rose-500 text-white border-rose-600')}
+              <button type="button" onclick="cycleCriterionWeight('${item.id}')" title="重み切替"
+                class="px-1.5 h-7 rounded-lg bg-white border border-[#DCDCD6] text-[10px] font-black text-neutral-700 hover:bg-neutral-100">
+                x${item.weight}
+              </button>
+              <button type="button" onclick="removeCriterion('${item.id}')" title="削除"
+                class="w-6 h-7 rounded-lg text-neutral-400 hover:text-rose-600 font-black text-xs">
+                &times;
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setCriterionStatus(id, status) {
+      const target = state.criteria.find((c) => c.id === id);
+      if (target) {
+        target.status = status;
+        runFullEvaluation();
       }
-
-      container.innerHTML = filtered.map(item => `
-        <div class="border border-[#E4E4DE] rounded-xl p-2.5 bg-[#FAFAF8] space-y-2">
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0">
-              <span class="text-[10px] font-bold text-neutral-400">${escapeHtml(item.category)}</span>
-              <div class="text-xs font-black text-[#111214] break-words">${escapeHtml(item.name)}</div>
-            </div>
-            <button onclick="deleteCriteriaItem('${item.id}')" title="項目を削除" class="text-[11px] font-bold text-neutral-400 hover:text-rose-600 px-1.5 py-0.5 shrink-0">
-              削除
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 text-[11px]">
-            <!-- 評価ステータス（〇 / △ / ×） -->
-            <div class="inline-flex rounded-lg overflow-hidden border border-[#DCDCD6] bg-white font-black">
-              <button onclick="setItemStatus('${item.id}', 'good')" class="px-2.5 py-1 ${item.status === 'good' ? 'bg-emerald-500 text-white' : 'text-neutral-600 hover:bg-neutral-100'}">〇</button>
-              <button onclick="setItemStatus('${item.id}', 'fair')" class="px-2.5 py-1 border-x border-[#DCDCD6] ${item.status === 'fair' ? 'bg-amber-400 text-neutral-950' : 'text-neutral-600 hover:bg-neutral-100'}">△</button>
-              <button onclick="setItemStatus('${item.id}', 'bad')" class="px-2.5 py-1 ${item.status === 'bad' ? 'bg-rose-500 text-white' : 'text-neutral-600 hover:bg-neutral-100'}">×</button>
-            </div>
-
-            <!-- 重み調整 -->
-            <div class="flex items-center gap-1.5">
-              <span class="text-[10px] font-bold text-neutral-500">重み</span>
-              <select onchange="setItemWeight('${item.id}', this.value)" class="bg-white border border-[#DCDCD6] rounded-lg px-1.5 py-1 text-[11px] font-black">
-                <option value="1" ${item.weight === 1 ? 'selected' : ''}>x1</option>
-                <option value="2" ${item.weight === 2 ? 'selected' : ''}>x2</option>
-                <option value="3" ${item.weight === 3 ? 'selected' : ''}>x3</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      `).join('');
     }
 
-    function setItemStatus(id, status) {
-      const target = state.criteria.find(c => c.id === id);
-      if (!target) return;
-      target.status = status;
-      renderCriteriaList();
-      runFullEvaluation();
+    function cycleCriterionWeight(id) {
+      const target = state.criteria.find((c) => c.id === id);
+      if (target) {
+        target.weight = target.weight >= 3 ? 1 : target.weight + 1;
+        runFullEvaluation();
+      }
     }
 
-    function setItemWeight(id, weightVal) {
-      const target = state.criteria.find(c => c.id === id);
-      if (!target) return;
-      target.weight = parseInt(weightVal, 10) || 1;
+    function removeCriterion(id) {
+      state.criteria = state.criteria.filter((c) => c.id !== id);
       runFullEvaluation();
-    }
-
-    function deleteCriteriaItem(id) {
-      state.criteria = state.criteria.filter(c => c.id !== id);
-      renderCriteriaList();
-      runFullEvaluation();
-      showToast('評価項目を削除しました');
     }
 
     function addCustomCriteriaItem() {
-      const nameInput = document.getElementById('newItemNameInput');
-      const name = nameInput.value.trim();
+      const nameEl = document.getElementById('newItemNameInput');
+      const catEl = document.getElementById('newItemCatSelect');
+      const weightEl = document.getElementById('newItemWeightSelect');
+      const name = (nameEl?.value || '').trim();
       if (!name) {
-        showToast('追加する評価項目名を入力してください');
+        showToast('追加する評価項目名を入力してください。');
         return;
       }
-      const category = document.getElementById('newItemCatSelect').value;
-      const weight = parseInt(document.getElementById('newItemWeightSelect').value, 10) || 2;
       state.criteria.unshift({
-        id: 'custom_' + Date.now(),
-        category,
+        id: 'c_custom_' + Date.now(),
+        category: catEl?.value || '生活導線',
         name,
-        weight,
-        status: 'fair',
-        isAlignmentPoint: category === '要確認ポイント'
+        weight: Number(weightEl?.value) || 2,
+        status: 'good',
+        isAlignmentPoint: (catEl?.value === '要確認ポイント')
       });
-      nameInput.value = '';
-      renderCriteriaList();
+      nameEl.value = '';
       runFullEvaluation();
-      showToast(`「${name}」を追加しました`);
+      showToast(`項目「${name}」を追加しました。`);
     }
 
     function resetDefaultCriteria() {
       state.criteria = JSON.parse(JSON.stringify(DEFAULT_CRITERIA));
-      renderCriteriaList();
+      state.selectedCategory = 'すべて';
       runFullEvaluation();
-      showToast('評価項目を初期リストに戻しました');
+      showToast('評価項目を初期状態に戻しました。');
     }
 
     // =========================================================================
-    // 8. 保存・横並び比較 ＆ 商談メモ複製
+    // 7. 比較保存・商談メモ複製・内見/契約チェック表
     // =========================================================================
     function saveCurrentToComparison() {
-      syncInputsToProperty();
-      const score = parseInt(document.getElementById('totalScoreNum').textContent, 10) || 0;
-      const rail = evaluateRailNetwork(state.property);
+      const spec = getSpecValues();
+      const score = Number(document.getElementById('totalScoreNum')?.textContent) || 0;
       const entry = {
-        id: Date.now().toString(),
-        title: state.property.title,
-        rent: state.property.totalRentMan,
-        walk: state.property.walkMin,
-        age: state.property.buildAge,
-        layoutArea: `${state.property.layout} / ${state.property.areaSqm}㎡`,
-        railPoints: rail.totalRailScore,
+        uid: Date.now(),
+        title: spec.title,
+        rentMan: spec.totalRentMan,
+        walkMin: spec.walkMin,
+        buildAge: spec.buildAge,
+        layout: spec.layout,
+        areaSqm: spec.areaSqm,
+        stationLine: spec.stationLine,
         score
       };
-      state.savedList.unshift(entry);
-      if (state.savedList.length > 8) state.savedList.pop();
+      state.savedProperties.unshift(entry);
+      if (state.savedProperties.length > 8) {
+        state.savedProperties = state.savedProperties.slice(0, 8);
+      }
       renderComparisonBoard();
-      saveToRoomStorage();
-      showToast('比較リストに保存しました');
+      saveRoomState();
+      broadcastState();
+      showToast(`「${entry.title}」を比較リストに保存しました。`);
     }
 
     function clearComparisonList() {
-      state.savedList = [];
+      state.savedProperties = [];
       renderComparisonBoard();
-      saveToRoomStorage();
-      showToast('比較リストをクリアしました');
+      saveRoomState();
+      broadcastState();
+      showToast('比較リストをクリアしました。');
     }
 
     function renderComparisonBoard() {
-      document.getElementById('savedCountLabel').textContent = `${state.savedList.length}件保存`;
       const board = document.getElementById('comparisonBoard');
-      if (state.savedList.length === 0) {
+      const label = document.getElementById('savedCountLabel');
+      if (!board || !label) return;
+      label.textContent = `${state.savedProperties.length}件保存`;
+
+      if (state.savedProperties.length === 0) {
         board.innerHTML = '<p class="text-xs text-neutral-400 py-3 text-center">「比較リストに保存」を押すと、ここに複数物件が並びます。</p>';
         return;
       }
+
       board.innerHTML = `
-        <table class="w-full text-left border-collapse text-xs min-w-[440px]">
-          <thead>
-            <tr class="border-b-2 border-[#111214] text-[10px] font-black text-neutral-500">
-              <th class="py-1.5 pr-2">物件</th>
-              <th class="py-1.5 px-2">総合</th>
-              <th class="py-1.5 px-2">賃料</th>
-              <th class="py-1.5 px-2">徒歩/築</th>
-              <th class="py-1.5 px-2">路線点</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-neutral-200">
-            ${state.savedList.map(item => `
-              <tr>
-                <td class="py-2 pr-2 font-black text-[#111214] max-w-[140px] truncate">${escapeHtml(item.title)}</td>
-                <td class="py-2 px-2"><span class="bg-[#111214] text-[#E6FF00] px-1.5 py-0.5 rounded font-black">${item.score}点</span></td>
-                <td class="py-2 px-2 font-bold">${item.rent}万</td>
-                <td class="py-2 px-2 text-neutral-700">${item.walk}分 / 築${item.age}年</td>
-                <td class="py-2 px-2 font-bold">${item.railPoints}/30</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <div class="flex gap-2.5 pb-1">
+          ${state.savedProperties.map((p) => `
+            <div class="shrink-0 w-44 bg-[#F8F8F6] border border-[#DCDCD6] rounded-xl p-2.5 space-y-1">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-xs font-black bg-[#111214] text-[#E6FF00] px-2 py-0.5 rounded">${p.score}点</span>
+                <span class="text-xs font-black text-[#111214]">${p.rentMan !== null ? p.rentMan + '万' : '未読取'}</span>
+              </div>
+              <div class="text-xs font-bold text-[#111214] truncate" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</div>
+              <div class="text-[10px] text-neutral-600 truncate">${escapeHtml(p.stationLine)} / 歩${p.walkMin ?? '?'}分</div>
+              <div class="text-[10px] text-neutral-500">${escapeHtml(p.layout)} / ${p.areaSqm !== null ? p.areaSqm + '㎡' : '㎡未読取'} / ${p.buildAge !== null ? '築' + p.buildAge + '年' : '築未読取'}</div>
+            </div>
+          `).join('')}
+        </div>
       `;
     }
 
     function copyAgentTalkScript() {
-      syncInputsToProperty();
-      const score = document.getElementById('totalScoreNum').textContent;
-      const rail = evaluateRailNetwork(state.property);
-      const text = [
-        `【物件評価メモ】${state.property.title}`,
-        `・総合スコア：${score}点（路線評価：${rail.totalRailScore}/30点）`,
-        `・条件：${state.property.totalRentMan}万円 / 徒歩${state.property.walkMin}分 / 築${state.property.buildAge}年 / ${state.property.layout} (${state.property.areaSqm}㎡)`,
-        `・路線判定：${rail.summary}`
+      const spec = getSpecValues();
+      const score = document.getElementById('totalScoreNum')?.textContent || '--';
+      const lines = [
+        `【物件確認メモ】${spec.title}`,
+        `・賃料＋管理費: ${spec.totalRentMan !== null ? spec.totalRentMan + '万円' : '未読取'}`,
+        `・最寄/徒歩: ${spec.stationLine} / 徒歩${spec.walkMin !== null ? spec.walkMin + '分' : '未読取'}`,
+        `・間取り/面積/築年数: ${spec.layout} / ${spec.areaSqm !== null ? spec.areaSqm + '㎡' : '未読取'} / ${spec.buildAge !== null ? '築' + spec.buildAge + '年' : '未読取'}`,
+        `・査定スコア: ${score}点`
       ].join('\n');
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      showToast('商談・共有用メモをコピーしました');
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lines).then(() => {
+          showToast('商談メモをクリップボードにコピーしました。');
+        }).catch(() => {
+          showToast('コピーに失敗しました。');
+        });
+      } else {
+        showToast('この環境ではクリップボードコピーに非対応です。');
+      }
     }
 
-    // =========================================================================
-    // 9. 内見チェック表 ＆ 契約時チェック表
-    // =========================================================================
     function renderChecklists() {
       const vContainer = document.getElementById('viewingChecklistContainer');
-      let vDone = 0;
-      vContainer.innerHTML = VIEWING_ITEMS.map((label, idx) => {
-        const key = `v_${idx}`;
-        const checked = !!state.viewingChecked[key];
-        if (checked) vDone++;
-        return `
-          <label class="flex items-start gap-2.5 p-2.5 rounded-xl border ${checked ? 'bg-emerald-50/70 border-emerald-200' : 'bg-[#FAFAF8] border-[#E4E4DE]'} cursor-pointer">
-            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleCheck('viewing', '${key}', this.checked)" class="mt-0.5 w-4 h-4 accent-[#111214]" />
-            <span class="text-xs font-bold ${checked ? 'line-through text-neutral-400' : 'text-[#111214]'}">${escapeHtml(label)}</span>
-          </label>
-        `;
-      }).join('');
-      document.getElementById('viewingProgressBadge').textContent = `${vDone} / ${VIEWING_ITEMS.length} 完了`;
+      const vBadge = document.getElementById('viewingProgressBadge');
+      if (vContainer && vBadge) {
+        const vDone = VIEWING_ITEMS.filter((i) => !!state.viewingChecked[i.id]).length;
+        vBadge.textContent = `${vDone} / ${VIEWING_ITEMS.length} 完了`;
+        vContainer.innerHTML = VIEWING_ITEMS.map((item) => {
+          const checked = !!state.viewingChecked[item.id];
+          return `
+            <button type="button" onclick="toggleChecklist('viewing', '${item.id}')"
+              class="w-full text-left p-3 rounded-xl border ${checked ? 'bg-emerald-50 border-emerald-400' : 'bg-[#F8F8F6] border-[#DCDCD6]'} flex items-start gap-2.5">
+              <span class="mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center text-xs font-black shrink-0 ${checked ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white border-neutral-400 text-transparent'}">✓</span>
+              <div>
+                <div class="text-xs font-bold text-[#111214] ${checked ? 'line-through text-neutral-500' : ''}">${escapeHtml(item.title)}</div>
+                <div class="text-[10px] text-neutral-500 mt-0.5">${escapeHtml(item.note)}</div>
+              </div>
+            </button>
+          `;
+        }).join('');
+      }
 
       const cContainer = document.getElementById('contractChecklistContainer');
-      let cDone = 0;
-      cContainer.innerHTML = CONTRACT_ITEMS.map((label, idx) => {
-        const key = `c_${idx}`;
-        const checked = !!state.contractChecked[key];
-        if (checked) cDone++;
-        return `
-          <label class="flex items-start gap-2.5 p-2.5 rounded-xl border ${checked ? 'bg-emerald-50/70 border-emerald-200' : 'bg-[#FAFAF8] border-[#E4E4DE]'} cursor-pointer">
-            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleCheck('contract', '${key}', this.checked)" class="mt-0.5 w-4 h-4 accent-[#111214]" />
-            <span class="text-xs font-bold ${checked ? 'line-through text-neutral-400' : 'text-[#111214]'}">${escapeHtml(label)}</span>
-          </label>
-        `;
-      }).join('');
-      document.getElementById('contractProgressBadge').textContent = `${cDone} / ${CONTRACT_ITEMS.length} 完了`;
+      const cBadge = document.getElementById('contractProgressBadge');
+      if (cContainer && cBadge) {
+        const cDone = CONTRACT_ITEMS.filter((i) => !!state.contractChecked[i.id]).length;
+        cBadge.textContent = `${cDone} / ${CONTRACT_ITEMS.length} 完了`;
+        cContainer.innerHTML = CONTRACT_ITEMS.map((item) => {
+          const checked = !!state.contractChecked[item.id];
+          return `
+            <button type="button" onclick="toggleChecklist('contract', '${item.id}')"
+              class="w-full text-left p-3 rounded-xl border ${checked ? 'bg-emerald-50 border-emerald-400' : 'bg-[#F8F8F6] border-[#DCDCD6]'} flex items-start gap-2.5">
+              <span class="mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center text-xs font-black shrink-0 ${checked ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white border-neutral-400 text-transparent'}">✓</span>
+              <div>
+                <div class="text-xs font-bold text-[#111214] ${checked ? 'line-through text-neutral-500' : ''}">${escapeHtml(item.title)}</div>
+                <div class="text-[10px] text-neutral-500 mt-0.5">${escapeHtml(item.note)}</div>
+              </div>
+            </button>
+          `;
+        }).join('');
+      }
     }
 
-    function toggleCheck(group, key, isChecked) {
-      if (group === 'viewing') {
-        state.viewingChecked[key] = isChecked;
+    function toggleChecklist(type, id) {
+      if (type === 'viewing') {
+        state.viewingChecked[id] = !state.viewingChecked[id];
       } else {
-        state.contractChecked[key] = isChecked;
+        state.contractChecked[id] = !state.contractChecked[id];
       }
       renderChecklists();
-      saveToRoomStorage();
+      saveRoomState();
+      broadcastState();
     }
 
     // =========================================================================
-    // 10. 表示モード（スマホ / PC3カラム / 不動産屋提示モード）＆ ステップ切替
+    // 8. 画面モード・ステップ切替・4桁コード同期
     // =========================================================================
     function setViewportMode(mode) {
       state.viewportMode = mode;
@@ -1326,46 +1686,33 @@
       const btnMob = document.getElementById('modeBtnMobile');
       const btnPc = document.getElementById('modeBtnPc');
 
-      const col1 = document.getElementById('colInputAndMap');
-      const col2 = document.getElementById('colScoreAndCompare');
-      const col3 = document.getElementById('colCustomMatrix');
-
       if (mode === 'pc') {
         mainEl.className = 'flex-1 w-full max-w-7xl mx-auto px-3 sm:px-5 py-4 transition-all duration-200';
         gridEl.className = 'grid grid-cols-1 lg:grid-cols-3 gap-4 items-start';
-        // PC商談時は左にカスタムマトリクス、中央に比較＆地図、右に商談戦略＆入力を配置可能
-        col3.className = 'bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3 min-w-0 lg:order-1';
-        col2.className = 'space-y-4 lg:order-2';
-        col1.className = 'space-y-4 lg:order-3';
-
         btnPc.className = 'px-2.5 py-1 rounded-lg bg-[#E6FF00] text-[#111214] font-black';
         btnMob.className = 'px-2.5 py-1 rounded-lg text-neutral-300 hover:text-white';
       } else {
         mainEl.className = 'flex-1 w-full max-w-[460px] mx-auto px-3 sm:px-5 py-4 transition-all duration-200';
         gridEl.className = 'grid grid-cols-1 gap-4';
-        col1.className = 'space-y-4';
-        col2.className = 'space-y-4';
-        col3.className = 'bg-white rounded-2xl border border-[#DCDCD6] p-4 shadow-xs space-y-3 min-w-0';
-
         btnMob.className = 'px-2.5 py-1 rounded-lg bg-[#E6FF00] text-[#111214] font-black';
         btnPc.className = 'px-2.5 py-1 rounded-lg text-neutral-300 hover:text-white';
       }
-      saveToRoomStorage();
+      saveRoomState();
     }
 
     function togglePresenterMode() {
       state.presenterMode = !state.presenterMode;
       const btn = document.getElementById('modeBtnPresent');
+      const box = document.getElementById('presenterSummaryBox');
       if (state.presenterMode) {
-        btn.textContent = '不動産屋提示用（適合度）';
-        btn.className = 'px-2.5 py-1.5 rounded-xl bg-emerald-400 border border-emerald-300 text-[11px] font-black text-[#111214]';
-        showToast('不動産屋提示モードに切り替えました');
+        btn.textContent = '商談提示モード ON';
+        btn.className = 'px-2.5 py-1.5 rounded-xl bg-[#E6FF00] text-[#111214] text-[11px] font-black';
+        box.classList.remove('hidden');
       } else {
         btn.textContent = '自分用（詳細・メモ）';
         btn.className = 'px-2.5 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-[11px] font-bold text-neutral-200 hover:text-white';
-        showToast('自分用詳細モードに戻しました');
+        box.classList.add('hidden');
       }
-      runFullEvaluation(true);
     }
 
     function setWorkflowStep(step) {
@@ -1374,217 +1721,138 @@
       document.getElementById('stepSectionViewing').classList.toggle('hidden', step !== 'viewing');
       document.getElementById('stepSectionContract').classList.toggle('hidden', step !== 'contract');
 
-      const tabs = [
-        { id: 'stepTab1', key: 'eval' },
-        { id: 'stepTab2', key: 'viewing' },
-        { id: 'stepTab3', key: 'contract' }
-      ];
-      tabs.forEach(t => {
-        const el = document.getElementById(t.id);
-        if (t.key === step) {
-          el.className = 'px-3 py-1.5 rounded-xl text-xs font-black bg-[#111214] text-[#E6FF00]';
-        } else {
-          el.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-700 hover:bg-neutral-200';
-        }
-      });
+      const tabCls = (active) => active
+        ? 'px-3 py-1.5 rounded-xl text-xs font-black bg-[#111214] text-[#E6FF00]'
+        : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-700 hover:bg-neutral-200';
+
+      document.getElementById('stepTab1').className = tabCls(step === 'eval');
+      document.getElementById('stepTab2').className = tabCls(step === 'viewing');
+      document.getElementById('stepTab3').className = tabCls(step === 'contract');
     }
 
-    function populatePropertyInputs() {
-      const p = state.property;
-      document.getElementById('inpPropertyTitle').value = p.title;
-      document.getElementById('inpTotalRentMan').value = p.totalRentMan;
-      document.getElementById('inpWalkMin').value = p.walkMin;
-      document.getElementById('inpBuildAge').value = p.buildAge;
-      document.getElementById('inpFloorNum').value = p.floorNum;
-      document.getElementById('inpMaxFloor').value = p.maxFloor;
-      document.getElementById('inpLayout').value = p.layout;
-      document.getElementById('inpAreaSqm').value = p.areaSqm;
-      document.getElementById('inpStationLine').value = p.stationLine;
-      document.getElementById('selStopType').value = p.stopType;
-      document.getElementById('selHubType').value = p.hubType;
-      document.getElementById('selCorridorVibe').value = p.corridorVibe;
-      document.getElementById('syncBannerInfo').textContent = `Room #${state.roomCode} 同期中（タブ間即時同期＆ローカル保存）`;
+    function setupBroadcastChannel(code) {
+      if (broadcastChannel) {
+        try { broadcastChannel.close(); } catch {}
+      }
+      if ('BroadcastChannel' in window) {
+        broadcastChannel = new BroadcastChannel(`studioCALX_maisoku_${code}`);
+        broadcastChannel.onmessage = (ev) => {
+          if (ev?.data?.type === 'STATE_SYNC' && ev.data.payload) {
+            applySnapshot(ev.data.payload, false);
+          }
+        };
+      }
     }
 
-    function renderAll(skipBroadcast = false) {
-      populatePropertyInputs();
-      renderMustHaveChips();
-      setViewportMode(state.viewportMode);
-      setWorkflowStep(state.workflowStep);
-      renderCategoryChips();
-      renderCriteriaList();
+    function connectRoomCode() {
+      const input = document.getElementById('roomCodeInput');
+      const digits = (input.value || '').replace(/\D/g, '').slice(0, 4).padEnd(4, '0');
+      input.value = digits;
+      state.roomCode = digits;
+      setupBroadcastChannel(digits);
+      loadRoomState(digits);
+      document.getElementById('syncBannerInfo').textContent = `Room #${digits} 同期中（タブ間即時同期＆ローカル保存）`;
+      showToast(`同期コード #${digits} に接続しました。`);
+    }
+
+    function randomizeRoomCode() {
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      document.getElementById('roomCodeInput').value = code;
+      connectRoomCode();
+    }
+
+    function collectSnapshot() {
+      return {
+        roomCode: state.roomCode,
+        spec: getSpecValues(),
+        mustHave: state.mustHave,
+        fieldSources: state.fieldSources,
+        criteria: state.criteria,
+        savedProperties: state.savedProperties,
+        viewingChecked: state.viewingChecked,
+        contractChecked: state.contractChecked
+      };
+    }
+
+    function applySnapshot(snap, shouldSave = true) {
+      if (!snap || typeof snap !== 'object') return;
+      if (snap.spec) {
+        document.getElementById('inpPropertyTitle').value = snap.spec.title ?? '';
+        document.getElementById('inpTotalRentMan').value = snap.spec.totalRentMan ?? '';
+        document.getElementById('inpWalkMin').value = snap.spec.walkMin ?? '';
+        document.getElementById('inpBuildAge').value = snap.spec.buildAge ?? '';
+        document.getElementById('inpFloorNum').value = snap.spec.floorNum ?? '';
+        document.getElementById('inpMaxFloor').value = snap.spec.maxFloor ?? '';
+        document.getElementById('inpLayout').value = snap.spec.layout ?? '';
+        document.getElementById('inpAreaSqm').value = snap.spec.areaSqm ?? '';
+        document.getElementById('inpStationLine').value = snap.spec.stationLine ?? '';
+        if (snap.spec.stopType) document.getElementById('selStopType').value = snap.spec.stopType;
+        if (snap.spec.hubType) document.getElementById('selHubType').value = snap.spec.hubType;
+        if (snap.spec.corridorVibe) document.getElementById('selCorridorVibe').value = snap.spec.corridorVibe;
+      }
+      if (snap.mustHave) state.mustHave = { ...state.mustHave, ...snap.mustHave };
+      if (snap.fieldSources) state.fieldSources = { ...snap.fieldSources };
+      if (Array.isArray(snap.criteria) && snap.criteria.length > 0) state.criteria = snap.criteria;
+      if (Array.isArray(snap.savedProperties)) state.savedProperties = snap.savedProperties;
+      if (snap.viewingChecked) state.viewingChecked = snap.viewingChecked;
+      if (snap.contractChecked) state.contractChecked = snap.contractChecked;
+
       renderComparisonBoard();
       renderChecklists();
-      runFullEvaluation(skipBroadcast);
+      runFullEvaluation();
+      if (shouldSave) saveRoomState();
     }
 
-    // =========================================================================
-    // 11. モーダル・トースト・エスケープ
-    // =========================================================================
-    function openPwaModal() {
-      document.getElementById('pwaModal').classList.remove('hidden');
-    }
-    function closePwaModal() {
-      document.getElementById('pwaModal').classList.add('hidden');
+    function saveRoomState() {
+      try {
+        localStorage.setItem(storageKeyForRoom(state.roomCode), JSON.stringify(collectSnapshot()));
+      } catch {
+        // ストレージ上限等は無視
+      }
     }
 
-    let toastTimer = null;
-    function showToast(msg) {
-      const box = document.getElementById('toastBox');
-      document.getElementById('toastMessage').textContent = msg;
-      box.classList.remove('hidden');
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => box.classList.add('hidden'), 3000);
+    function loadRoomState(code) {
+      try {
+        const raw = localStorage.getItem(storageKeyForRoom(code));
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        applySnapshot(parsed, false);
+      } catch {
+        // 破損時は無視
+      }
     }
-    function hideToast() {
-      document.getElementById('toastBox').classList.add('hidden');
+
+    function broadcastState() {
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.postMessage({ type: 'STATE_SYNC', payload: collectSnapshot() });
+        } catch {}
+      }
     }
 
     function escapeHtml(str) {
-      if (str === null || str === undefined) return '';
-      return String(str)
+      return String(str ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
- async function handleFlyerImage(event) {
-  const file = event?.target?.files?.[0];
-  if (!file) return;
-
-  if (typeof showToast === "function") {
-    showToast("AIでマイソクを解析中...");
-  }
-
-  try {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const s = String(reader.result || "");
-        resolve(s.includes(",") ? s.split(",")[1] : s);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageBase64: base64,
-        mimeType: file.type || "image/jpeg",
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data?.error || "解析に失敗しました");
+        .replace(/'/g, '&#39;');
     }
 
-    const fireEvents = (el) => {
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      el.dispatchEvent(new Event("blur", { bubbles: true }));
-    };
-
-    // ラベル文言・placeholder・id・name に一致する入力欄へ値を流し込む関数
-    const setByKeywords = (keywords, val) => {
-      if (val === undefined || val === null || val === "") return;
-      const strVal = String(val);
-      const fields = Array.from(document.querySelectorAll("input, textarea, select")).filter(
-        (el) => el.type !== "file" && el.type !== "hidden"
-      );
-
-      for (const el of fields) {
-        const ph = (el.getAttribute("placeholder") || "").toLowerCase();
-        const id = (el.id || "").toLowerCase();
-        const nm = (el.name || "").toLowerCase();
-
-        // 直前や親要素のラベルテキストを取得
-        const parentText = (el.closest("div, label")?.innerText || "").toLowerCase();
-        const prevText = (el.previousElementSibling?.innerText || "").toLowerCase();
-        const haystack = `${ph} ${id} ${nm} ${parentText} ${prevText}`;
-
-        const matched = keywords.some((kw) => haystack.includes(kw.toLowerCase()));
-        if (matched && "value" in el) {
-          el.value = strVal;
-          fireEvents(el);
-        }
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.innerWidth >= 1024) {
+        setViewportMode('pc');
+      } else {
+        setViewportMode('mobile');
       }
-    };
-
-    const summaryMemo = [
-      data.station ? `最寄: ${data.station}` : "",
-      data.layout ? `間取り: ${data.layout}` : "",
-      data.structure ? `構造: ${data.structure}` : "",
-      data.age_years != null ? `築${data.age_years}年` : "",
-      data.notes || "",
-    ]
-      .filter(Boolean)
-      .join(" / ");
-
-    setByKeywords(["物件名", "所在地", "タイトル", "title"], data.title);
-    setByKeywords(["家賃", "賃料", "rent"], data.rent_man);
-    setByKeywords(["駅", "徒歩", "路線", "station"], data.station);
-    setByKeywords(["築", "age"], data.age_years);
-    setByKeywords(["構造", "階", "structure"], data.structure);
-    setByKeywords(["間取り", "面積", "layout"], data.layout);
-    setByKeywords(["メモ", "備考", "推察", "memo", "note"], summaryMemo);
-
-    // 画面上部のAI解析結果カードも更新
-    let box = document.getElementById("aiResultCard");
-    if (!box) {
-      box = document.createElement("div");
-      box.id = "aiResultCard";
-      box.style.cssText =
-        "margin:12px;padding:12px;border-radius:12px;background:#18181b;color:#f4f4f5;border:2px solid #eab308;font-size:13px;line-height:1.6;z-index:50;";
-      const mainTarget = document.querySelector("main") || document.body;
-      mainTarget.prepend(box);
-    }
-
-    const esc = (v) =>
-      String(v ?? "-")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-
-    box.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <strong style="color:#facc15;">AI解析結果（マイソク読取）</strong>
-        <button type="button" onclick="this.parentElement.parentElement.remove()" style="background:#3f3f46;color:#fff;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;">閉じる</button>
-      </div>
-      <div><strong>物件:</strong> ${esc(data.title)}</div>
-      <div><strong>家賃:</strong> ${esc(data.rent_man)} 万円 ／ <strong>間取り:</strong> ${esc(data.layout)}</div>
-      <div><strong>最寄駅:</strong> ${esc(data.station)}</div>
-      <div><strong>築年数:</strong> ${esc(data.age_years)} 年 ／ <strong>構造:</strong> ${esc(data.structure)}</div>
-      <div><strong>メモ・推察:</strong> ${esc(data.notes)}</div>
-    `;
-
-    // 既存の再計算・描画関数があれば呼び出す
-    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll", "updateUI", "recalc"]) {
-      if (typeof window[fnName] === "function") {
-        try {
-          window[fnName](data);
-        } catch (_) {}
-      }
-    }
-
-    if (typeof showToast === "function") {
-      showToast("マイソク解析と入力反映が完了しました");
-    }
-  } catch (err) {
-    if (typeof showToast === "function") {
-      showToast(`エラー: ${err.message}`);
-    } else {
-      alert(`解析エラー: ${err.message}`);
-    }
-  } finally {
-    if (event?.target) {
-      event.target.value = "";
-    }
-  }
-}
+      setupBroadcastChannel(state.roomCode);
+      loadShimizuSample();
+      loadRoomState(state.roomCode);
+      renderComparisonBoard();
+      renderChecklists();
+      renderFolderAlbum();
+    });
   </script>
 </body>
 </html>

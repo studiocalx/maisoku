@@ -51,13 +51,17 @@ export async function onRequestPost(context) {
 画像から読み取れる情報をJSONのみで返してください（Markdownの\`\`\`は付けないこと）。
 キーは以下の通り：
 {
-  "title": "物件名・特徴の要約",
-  "rent_man": 数値またはnull（万円単位の賃料、例: 6.2）,
-  "station": "最寄り駅・徒歩分数",
+  "title": "物件名・所在地の短い表記",
+  "rent_man": 数値またはnull（万円単位の月額賃料）,
+  "station": "駅名・路線名のみ。徒歩分数は含めない",
+  "walk_min": 数値またはnull（駅徒歩分数）,
   "age_years": 数値またはnull（築年数）,
-  "structure": "構造・階数（例: RC造 8階建/3階）",
-  "layout": "間取り・面積",
-  "notes": "設備・備考・懸念点（EV有無や再建築不可などの推測メモも簡潔に）"
+  "structure": "建物構造のみ（木造・鉄骨造・RC造など）",
+  "floor_num": 数値またはnull（対象住戸の所在階）,
+  "max_floor": 数値またはnull（建物の地上階数）,
+  "layout": "間取りのみ（ワンルーム・1K・1DKなど）",
+  "area_sqm": 数値またはnull（専有面積、平方メートル）,
+  "notes": "設備・備考。画像に書かれていない情報は推測せず、未記載とする"
 }`;
 
     const payload = JSON.stringify({

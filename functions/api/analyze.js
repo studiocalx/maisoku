@@ -1,3 +1,6 @@
+let modelCache = null;
+let modelCacheAt = 0;
+
 export async function onRequestPost(context) {
   try {
     const apiKey = context.env.GEMINI_API_KEY;
@@ -9,6 +12,9 @@ export async function onRequestPost(context) {
     }
 
     const { imageBase64, mimeType = "image/jpeg" } = await context.request.json();
+    if (!/^image\/(jpeg|png|webp)$/i.test(mimeType)) {
+      return new Response(JSON.stringify({ error: "JPEG・PNG・WebP画像のみ対応しています" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
     if (!imageBase64) {
       return new Response(
         JSON.stringify({ error: "画像データが空です" }),
@@ -16,29 +22,24 @@ export async function onRequestPost(context) {
       );
     }
 
-    // 1. 今このAPIキーで利用でき、generateContent に対応しているモデル一覧を取得
-    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
-    const listRes = await fetch(listUrl);
-    const listData = await listRes.json();
-
-    if (!listRes.ok) {
-      const msg = listData?.error?.message || JSON.stringify(listData);
-      return new Response(
-        JSON.stringify({ error: `モデル一覧の取得に失敗 (${listRes.status}): ${msg}` }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+    // 利用可能モデル一覧を短時間キャッシュし、毎回の余分なAPI往復を抑える
+    let supportedModels = modelCache && Date.now() - modelCacheAt < 10 * 60 * 1000 ? modelCache : null;
+    if (!supportedModels) {
+      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+      const listRes = await fetch(listUrl);
+      const listData = await listRes.json();
+      if (!listRes.ok) {
+        const msg = listData?.error?.message || JSON.stringify(listData);
+        return new Response(JSON.stringify({ error: `モデル一覧の取得に失敗 (${listRes.status}): ${msg}` }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+      supportedModels = (listData?.models || [])
+        .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+        .map((m) => m.name.replace(/^models\//, ""));
+      supportedModels.sort((a, b) => Number(!a.includes("flash")) - Number(!b.includes("flash")));
+      modelCache = supportedModels;
+      modelCacheAt = Date.now();
     }
 
-    const supportedModels = (listData?.models || [])
-      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
-      .map((m) => m.name.replace(/^models\//, ""));
-
-    // flash系を優先して先頭に並べる
-    supportedModels.sort((a, b) => {
-      const aFlash = a.includes("flash") ? 0 : 1;
-      const bFlash = b.includes("flash") ? 0 : 1;
-      return aFlash - bFlash;
-    });
 
     if (supportedModels.length === 0) {
       return new Response(
@@ -99,6 +100,8 @@ export async function onRequestPost(context) {
 
       lastStatus = res.status;
       lastMsg = data?.error?.message || JSON.stringify(data);
+      // 認証・利用上限・課金設定のエラーは別モデルでも直らないため即時終了
+      if (res.status === 401 || res.status === 403 || res.status === 429) break;
     }
 
     return new Response(

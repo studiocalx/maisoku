@@ -1450,139 +1450,153 @@
         .replace(/'/g, '&#039;');
     }
  async function handleFlyerImage(event) {
-  const file = event?.target?.files?.[0];
+  const input = event?.target;
+  const file = input?.files?.[0];
   if (!file) return;
 
-  if (typeof showToast === "function") {
-    showToast("AIでマイソクを解析中...");
-  }
+  const toast = (message) => {
+    if (typeof showToast === "function") showToast(message);
+  };
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = value == null ? "" : String(value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const numberFrom = (value) => {
+    if (value == null || value === "") return "";
+    const match = String(value).replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+    return match ? match[0] : "";
+  };
+  const compressForOcr = async (sourceFile) => {
+    const maxSide = 2500;
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(sourceFile);
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) throw new Error("画像処理を開始できませんでした");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
+      if (!blob) throw new Error("画像の圧縮に失敗しました");
+      return blob;
+    } finally {
+      if (bitmap) bitmap.close();
+    }
+  };
 
   try {
+    if (!/^image\/(jpeg|png|webp)$/i.test(file.type || "")) {
+      throw new Error("JPEG・PNG・WebP画像を選択してください");
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      throw new Error("元画像が20MBを超えています。カメラ設定または写真サイズを下げてください");
+    }
+
+    // 元画像をプレビューに残し、送信データだけを圧縮する
+    const preview = document.getElementById("previewImageEl");
+    const previewBox = document.getElementById("imagePreviewBox");
+    const overlay = document.getElementById("scanOverlay");
+    if (preview && previewBox) {
+      if (window._maisokuPreviewUrl) URL.revokeObjectURL(window._maisokuPreviewUrl);
+      window._maisokuPreviewUrl = URL.createObjectURL(file);
+      preview.src = window._maisokuPreviewUrl;
+      previewBox.classList.remove("hidden");
+    }
+    if (overlay) overlay.classList.remove("hidden");
+
+    toast("画像を最適化してAIで読み取り中...");
+    const compressed = await compressForOcr(file);
+    if (compressed.size > 12 * 1024 * 1024) {
+      throw new Error("圧縮後も12MBを超えています。画像を小さくして再試行してください");
+    }
+
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const s = String(reader.result || "");
-        resolve(s.includes(",") ? s.split(",")[1] : s);
+        const result = String(reader.result || "");
+        resolve(result.includes(",") ? result.split(",")[1] : result);
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      reader.onerror = () => reject(new Error("画像データを読み込めませんでした"));
+      reader.readAsDataURL(compressed);
     });
 
     const res = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageBase64: base64,
-        mimeType: file.type || "image/jpeg",
-      }),
+      body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg" })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "AI解析に失敗しました");
+    if (!data || typeof data !== "object") throw new Error("AIの返答形式を確認できませんでした");
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data?.error || "解析に失敗しました");
-    }
+    // 前の物件の値が残らないよう、OCR対象の物件欄をいったん初期化
+    [
+      "inpPropertyTitle", "inpTotalRentMan", "inpWalkMin", "inpBuildAge",
+      "inpFloorNum", "inpMaxFloor", "inpLayout", "inpAreaSqm", "inpStationLine"
+    ].forEach((id) => setValue(id, ""));
 
-    const fireEvents = (el) => {
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      el.dispatchEvent(new Event("blur", { bubbles: true }));
-    };
+    const title = data.title || "";
+    const rent = numberFrom(data.rent_man);
+    const age = numberFrom(data.age_years);
+    const layoutText = data.layout || "";
+    const areaMatch = layoutText.match(/(\d+(?:\.\d+)?)\s*(?:㎡|m2|m²)/i);
+    const layout = layoutText.replace(/[,／/]?\s*\d+(?:\.\d+)?\s*(?:㎡|m2|m²)/ig, "").trim();
+    const stationText = data.station || "";
+    const walkMatch = stationText.match(/徒歩\s*(\d+)\s*分/);
+    const stationName = stationText.replace(/[／,，]?\s*徒歩\s*\d+\s*分/g, "").trim();
+    const structureText = data.structure || "";
+    const maxFloorMatch = structureText.match(/(\d+)\s*階建/);
+    const floorMatch = structureText.match(/(?:\/|・|対象住戸|所在)\s*(\d+)\s*階/) || structureText.match(/(\d+)\s*階(?:部分|住戸)/);
 
-    // ラベル文言・placeholder・id・name に一致する入力欄へ値を流し込む関数
-    const setByKeywords = (keywords, val) => {
-      if (val === undefined || val === null || val === "") return;
-      const strVal = String(val);
-      const fields = Array.from(document.querySelectorAll("input, textarea, select")).filter(
-        (el) => el.type !== "file" && el.type !== "hidden"
-      );
+    setValue("inpPropertyTitle", title);
+    setValue("inpTotalRentMan", rent);
+    setValue("inpWalkMin", walkMatch ? walkMatch[1] : "");
+    setValue("inpBuildAge", age);
+    setValue("inpFloorNum", floorMatch ? floorMatch[1] : "");
+    setValue("inpMaxFloor", maxFloorMatch ? maxFloorMatch[1] : "");
+    setValue("inpLayout", layout || layoutText);
+    setValue("inpAreaSqm", areaMatch ? areaMatch[1] : "");
+    setValue("inpStationLine", stationName);
 
-      for (const el of fields) {
-        const ph = (el.getAttribute("placeholder") || "").toLowerCase();
-        const id = (el.id || "").toLowerCase();
-        const nm = (el.name || "").toLowerCase();
-
-        // 直前や親要素のラベルテキストを取得
-        const parentText = (el.closest("div, label")?.innerText || "").toLowerCase();
-        const prevText = (el.previousElementSibling?.innerText || "").toLowerCase();
-        const haystack = `${ph} ${id} ${nm} ${parentText} ${prevText}`;
-
-        const matched = keywords.some((kw) => haystack.includes(kw.toLowerCase()));
-        if (matched && "value" in el) {
-          el.value = strVal;
-          fireEvents(el);
-        }
-      }
-    };
-
-    const summaryMemo = [
-      data.station ? `最寄: ${data.station}` : "",
-      data.layout ? `間取り: ${data.layout}` : "",
-      data.structure ? `構造: ${data.structure}` : "",
-      data.age_years != null ? `築${data.age_years}年` : "",
-      data.notes || "",
-    ]
-      .filter(Boolean)
-      .join(" / ");
-
-    setByKeywords(["物件名", "所在地", "タイトル", "title"], data.title);
-    setByKeywords(["家賃", "賃料", "rent"], data.rent_man);
-    setByKeywords(["駅", "徒歩", "路線", "station"], data.station);
-    setByKeywords(["築", "age"], data.age_years);
-    setByKeywords(["構造", "階", "structure"], data.structure);
-    setByKeywords(["間取り", "面積", "layout"], data.layout);
-    setByKeywords(["メモ", "備考", "推察", "memo", "note"], summaryMemo);
-
-    // 画面上部のAI解析結果カードも更新
+    // OCR結果の確認カード。管理費・階数など未読取項目は未確認と明示
     let box = document.getElementById("aiResultCard");
     if (!box) {
-      box = document.createElement("div");
+      box = document.createElement("section");
       box.id = "aiResultCard";
-      box.style.cssText =
-        "margin:12px;padding:12px;border-radius:12px;background:#18181b;color:#f4f4f5;border:2px solid #eab308;font-size:13px;line-height:1.6;z-index:50;";
-      const mainTarget = document.querySelector("main") || document.body;
-      mainTarget.prepend(box);
+      box.style.cssText = "margin:12px 0;padding:12px;border-radius:12px;background:#18181b;color:#f4f4f5;border:2px solid #eab308;font-size:13px;line-height:1.65;";
+      const target = document.getElementById("colInputAndMap") || document.querySelector("main") || document.body;
+      target.prepend(box);
     }
-
-    const esc = (v) =>
-      String(v ?? "-")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-
+    const esc = (value) => String(value ?? "未読取").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <strong style="color:#facc15;">AI解析結果（マイソク読取）</strong>
-        <button type="button" onclick="this.parentElement.parentElement.remove()" style="background:#3f3f46;color:#fff;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;">閉じる</button>
+        <strong style="color:#facc15;">AI解析結果｜原本照合してください</strong>
+        <button type="button" onclick="this.closest('#aiResultCard').remove()" style="background:#3f3f46;color:#fff;border:0;border-radius:6px;padding:2px 8px;">閉じる</button>
       </div>
-      <div><strong>物件:</strong> ${esc(data.title)}</div>
-      <div><strong>家賃:</strong> ${esc(data.rent_man)} 万円 ／ <strong>間取り:</strong> ${esc(data.layout)}</div>
-      <div><strong>最寄駅:</strong> ${esc(data.station)}</div>
-      <div><strong>築年数:</strong> ${esc(data.age_years)} 年 ／ <strong>構造:</strong> ${esc(data.structure)}</div>
-      <div><strong>メモ・推察:</strong> ${esc(data.notes)}</div>
+      <div><b>物件:</b> ${esc(data.title)}</div>
+      <div><b>賃料:</b> ${esc(data.rent_man)}万円（管理費との合算は未確認）</div>
+      <div><b>間取り・面積:</b> ${esc(data.layout)}</div>
+      <div><b>最寄駅:</b> ${esc(data.station)}</div>
+      <div><b>築年数:</b> ${esc(data.age_years)}年 ／ <b>構造・階数:</b> ${esc(data.structure)}</div>
+      <div><b>備考:</b> ${esc(data.notes)}</div>
+      <div style="margin-top:6px;color:#fde68a;font-size:11px;">読み取れなかった項目は空欄です。賃料・管理費・契約条件は必ずチラシ原本で確認してください。</div>
     `;
 
-    // 既存の再計算・描画関数があれば呼び出す
-    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll", "updateUI", "recalc"]) {
-      if (typeof window[fnName] === "function") {
-        try {
-          window[fnName](data);
-        } catch (_) {}
-      }
-    }
-
-    if (typeof showToast === "function") {
-      showToast("マイソク解析と入力反映が完了しました");
-    }
-  } catch (err) {
-    if (typeof showToast === "function") {
-      showToast(`エラー: ${err.message}`);
-    } else {
-      alert(`解析エラー: ${err.message}`);
-    }
+    if (typeof runFullEvaluation === "function") runFullEvaluation();
+    if (typeof saveToRoomStorage === "function") saveToRoomStorage();
+    toast("AI読み取り完了。空欄と金額を原本で確認してください");
+  } catch (error) {
+    toast(`エラー: ${error.message || "画像解析に失敗しました"}`);
   } finally {
-    if (event?.target) {
-      event.target.value = "";
-    }
+    if (overlay) overlay.classList.add("hidden");
+    if (input) input.value = "";
   }
 }
   </script>

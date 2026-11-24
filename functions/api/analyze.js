@@ -16,6 +16,37 @@ export async function onRequestPost(context) {
       );
     }
 
+    // 1. 今このAPIキーで利用でき、generateContent に対応しているモデル一覧を取得
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+    const listRes = await fetch(listUrl);
+    const listData = await listRes.json();
+
+    if (!listRes.ok) {
+      const msg = listData?.error?.message || JSON.stringify(listData);
+      return new Response(
+        JSON.stringify({ error: `モデル一覧の取得に失敗 (${listRes.status}): ${msg}` }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const supportedModels = (listData?.models || [])
+      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+      .map((m) => m.name.replace(/^models\//, ""));
+
+    // flash系を優先して先頭に並べる
+    supportedModels.sort((a, b) => {
+      const aFlash = a.includes("flash") ? 0 : 1;
+      const bFlash = b.includes("flash") ? 0 : 1;
+      return aFlash - bFlash;
+    });
+
+    if (supportedModels.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "このAPIキーで利用可能な generateContent モデルが見つかりません" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     const prompt = `あなたは不動産マイソク（物件チラシ）の解析アシスタントです。
 画像から読み取れる情報をJSONのみで返してください（Markdownの\`\`\`は付けないこと）。
 キーは以下の通り：
@@ -45,11 +76,10 @@ export async function onRequestPost(context) {
       ],
     });
 
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
     let lastStatus = 500;
     let lastMsg = "不明なエラー";
 
-    for (const model of models) {
+    for (const model of supportedModels.slice(0, 4)) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res = await fetch(url, {
         method: "POST",
@@ -69,15 +99,12 @@ export async function onRequestPost(context) {
 
       lastStatus = res.status;
       lastMsg = data?.error?.message || JSON.stringify(data);
-
-      // 404（モデル未対応など）のときだけ次の候補モデルを試す
-      if (res.status !== 404) {
-        break;
-      }
     }
 
     return new Response(
-      JSON.stringify({ error: `Google側エラー (${lastStatus}): ${lastMsg}` }),
+      JSON.stringify({
+        error: `Google側エラー (${lastStatus}): ${lastMsg} / 試行モデル: ${supportedModels.slice(0, 4).join(", ")}`,
+      }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {

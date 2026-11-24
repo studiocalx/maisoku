@@ -1449,6 +1449,49 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
     }
+    async function handleFlyerImage(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const s = String(reader.result || "");
+        resolve(s.includes(",") ? s.split(",")[1] : s);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: base64,
+        mimeType: file.type || "image/jpeg",
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert("解析エラー: " + (data?.error || "失敗しました"));
+      return;
+    }
+
+    alert(
+      "読み取り完了:\n" +
+      "物件: " + (data.title || "-") + "\n" +
+      "家賃: " + (data.rent_man ?? "-") + "万円\n" +
+      "駅: " + (data.station || "-") + "\n" +
+      "築年数: " + (data.age_years ?? "-") + "年\n" +
+      "構造: " + (data.structure || "-") + "\n" +
+      "メモ: " + (data.notes || "-")
+    );
+  } catch (err) {
+    alert("通信エラー: " + err.message);
+  }
+}
   </script>
 </body>
 </html>

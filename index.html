@@ -1482,33 +1482,57 @@
       throw new Error(data?.error || "解析に失敗しました");
     }
 
-    // 1. フォーム部品（input / textarea / select）へ反映するヘルパー
-    const fillField = (ids, val) => {
-      if (val === undefined || val === null || val === "") return false;
-      let hit = false;
-      for (const id of ids) {
-        const el = document.getElementById(id);
-        if (el) {
-          if ("value" in el) {
-            el.value = String(val);
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-            hit = true;
-          }
-        }
-      }
-      return hit;
+    const fireEvents = (el) => {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true }));
     };
 
-    fillField(["propertyTitle", "titleInput", "title", "propTitle", "nameInput"], data.title);
-    fillField(["rentInput", "rent", "priceInput", "price", "chinryo"], data.rent_man);
-    fillField(["stationInput", "station", "ekiInput", "eki", "accessInput"], data.station);
-    fillField(["ageInput", "age", "chikunenInput", "buildAge"], data.age_years);
-    fillField(["structureInput", "structure", "kozoInput", "floorInput"], data.structure);
-    fillField(["layoutInput", "layout", "madoriInput", "areaInput"], data.layout);
-    fillField(["notesInput", "notes", "memoInput", "memo", "commentInput"], data.notes);
+    // ラベル文言・placeholder・id・name に一致する入力欄へ値を流し込む関数
+    const setByKeywords = (keywords, val) => {
+      if (val === undefined || val === null || val === "") return;
+      const strVal = String(val);
+      const fields = Array.from(document.querySelectorAll("input, textarea, select")).filter(
+        (el) => el.type !== "file" && el.type !== "hidden"
+      );
 
-    // 2. 画面内にAI解析結果を表示するカードがなければ自動生成して最上部に表示
+      for (const el of fields) {
+        const ph = (el.getAttribute("placeholder") || "").toLowerCase();
+        const id = (el.id || "").toLowerCase();
+        const nm = (el.name || "").toLowerCase();
+
+        // 直前や親要素のラベルテキストを取得
+        const parentText = (el.closest("div, label")?.innerText || "").toLowerCase();
+        const prevText = (el.previousElementSibling?.innerText || "").toLowerCase();
+        const haystack = `${ph} ${id} ${nm} ${parentText} ${prevText}`;
+
+        const matched = keywords.some((kw) => haystack.includes(kw.toLowerCase()));
+        if (matched && "value" in el) {
+          el.value = strVal;
+          fireEvents(el);
+        }
+      }
+    };
+
+    const summaryMemo = [
+      data.station ? `最寄: ${data.station}` : "",
+      data.layout ? `間取り: ${data.layout}` : "",
+      data.structure ? `構造: ${data.structure}` : "",
+      data.age_years != null ? `築${data.age_years}年` : "",
+      data.notes || "",
+    ]
+      .filter(Boolean)
+      .join(" / ");
+
+    setByKeywords(["物件名", "所在地", "タイトル", "title"], data.title);
+    setByKeywords(["家賃", "賃料", "rent"], data.rent_man);
+    setByKeywords(["駅", "徒歩", "路線", "station"], data.station);
+    setByKeywords(["築", "age"], data.age_years);
+    setByKeywords(["構造", "階", "structure"], data.structure);
+    setByKeywords(["間取り", "面積", "layout"], data.layout);
+    setByKeywords(["メモ", "備考", "推察", "memo", "note"], summaryMemo);
+
+    // 画面上部のAI解析結果カードも更新
     let box = document.getElementById("aiResultCard");
     if (!box) {
       box = document.createElement("div");
@@ -1537,8 +1561,8 @@
       <div><strong>メモ・推察:</strong> ${esc(data.notes)}</div>
     `;
 
-    // 3. 既存の再計算・描画関数があれば呼び出す
-    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll", "updateUI"]) {
+    // 既存の再計算・描画関数があれば呼び出す
+    for (const fnName of ["updateEvaluation", "renderEvaluation", "calculateScore", "renderAll", "updateUI", "recalc"]) {
       if (typeof window[fnName] === "function") {
         try {
           window[fnName](data);
@@ -1547,7 +1571,7 @@
     }
 
     if (typeof showToast === "function") {
-      showToast("マイソク解析が完了しました");
+      showToast("マイソク解析と入力反映が完了しました");
     }
   } catch (err) {
     if (typeof showToast === "function") {

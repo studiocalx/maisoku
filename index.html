@@ -295,6 +295,7 @@
             <div id="railAnalysisSummary" class="bg-[#F8F8F6] rounded-xl p-2.5 text-xs text-neutral-700 font-medium leading-relaxed border border-neutral-200">
               <!-- JSで沿線分析を表示 -->
             </div>
+            <p class="text-[10px] text-neutral-500">※路線・停車種別・乗換ハブ性は選択内容に基づく簡易評価です。最新の運行情報や駅データを自動照合する機能ではありません。</p>
           </div>
 
           <!-- ミニ地図（同心円距離リング＆生活圏ピン＋外部地図リンク） -->
@@ -351,6 +352,7 @@
                 <span class="text-[10px] font-black uppercase tracking-wider text-[#E6FF00]">Total Evaluation</span>
                 <h2 id="evalTitleDisplay" class="text-base font-black leading-snug mt-0.5">物件名</h2>
                 <p id="evalVerdictText" class="text-xs text-neutral-300 mt-1 leading-relaxed">判定コメント</p>
+                <p class="text-[10px] text-amber-200 mt-1">※市場賃料や物件価格の査定ではありません。登録した希望条件に対する適合度の目安です。</p>
               </div>
               <div class="shrink-0 bg-neutral-900 border border-neutral-700 rounded-2xl px-3.5 py-2 text-center min-w-[86px]">
                 <div class="flex items-baseline justify-center">
@@ -893,13 +895,13 @@
     function generateSmartInferences(prop) {
       const inferences = [];
 
-      // 1. エレベーター推察（建築基準法31mルール・築古低中層）
+      // 1. エレベーター推察（築年数・建物階数からの参考推察。法令判定ではない）
       if (!state.mustHaves.ev && prop.buildAge >= 25 && prop.maxFloor <= 6) {
         const isUpperNoEv = prop.floorNum >= 3;
         inferences.push({
           tag: isUpperNoEv ? 'EVなし濃厚・階段注意' : '設備推察',
           badgeClass: isUpperNoEv ? 'bg-amber-200 text-amber-950' : 'bg-amber-100 text-amber-900',
-          title: `エレベーター：${prop.maxFloor}階建・築${prop.buildAge}年のため未設置の可能性が高い（建築基準法31mルール推察）`,
+          title: `エレベーター：${prop.maxFloor}階建・築${prop.buildAge}年のため未設置の可能性があります（現地・管理会社への確認が必要）`,
           talk: `「${prop.maxFloor}階建の築年数なので階段物件かと思いますが、エレベーターの有無だけ教えていただけますか？」と確認できます。`
         });
       }
@@ -907,9 +909,9 @@
       // 2. 耐震基準推察（1981年6月以前＝築45年以上）
       if (prop.buildAge >= 45) {
         inferences.push({
-          tag: '旧耐震ゾーン',
+          tag: '耐震基準の確認が必要',
           badgeClass: 'bg-amber-100 text-amber-900',
-          title: '耐震基準：1981年以前の旧耐震基準に該当する可能性',
+          title: '耐震基準：築年数だけでは断定できません。建築確認日・耐震診断・補強履歴を確認してください',
           talk: '「室内のリフォーム状態が良さそうですね。建物は旧耐震の世代かと思いますが、耐震補強や配管更新の履歴はありますか？」と自然に話題にできます。'
         });
       }

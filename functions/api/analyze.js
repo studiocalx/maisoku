@@ -29,44 +29,57 @@ export async function onRequestPost(context) {
   "notes": "設備・備考・懸念点（EV有無や再建築不可などの推測メモも簡潔に）"
 }`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-    const res = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: imageBase64,
-                },
+    const payload = JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64,
               },
-            ],
-          },
-        ],
-      }),
+            },
+          ],
+        },
+      ],
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      const googleMsg = data?.error?.message || JSON.stringify(data);
-      return new Response(
-        JSON.stringify({ error: `Google側エラー (${res.status}): ${googleMsg}` }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    let lastStatus = 500;
+    let lastMsg = "不明なエラー";
+
+    for (const model of models) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const cleaned = rawText.replace(/```json|```/g, "").trim();
+        return new Response(cleaned, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      lastStatus = res.status;
+      lastMsg = data?.error?.message || JSON.stringify(data);
+
+      // 404（モデル未対応など）のときだけ次の候補モデルを試す
+      if (res.status !== 404) {
+        break;
+      }
     }
 
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-    return new Response(cleaned, {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: `Google側エラー (${lastStatus}): ${lastMsg}` }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   } catch (err) {
     return new Response(
       JSON.stringify({ error: `サーバーエラー: ${err.message || "不明"}` }),

@@ -3,12 +3,12 @@ import { allRecords, saveRecord, deleteRecord, getRecord, replaceAllData, export
 const $ = (id) => document.getElementById(id);
 const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set() };
 const HOUSING_REFERENCE = {
-  "大阪市": { amount: 40000, confidence: "公式直接確認", areaRule: true },
-  "枚方市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" },
-  "門真市": { amount: 39000, confidence: "間接確認・要再確認", areaRule: "可能性あり・金額未確認" },
-  "八尾市": { amount: 39000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" },
-  "東大阪市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" },
-  "尼崎市": { amount: 42500, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" }
+  "大阪市": { amount: 40000, confidence: "公式直接確認", areaRule: true, source: "https://www.city.osaka.lg.jp/fukushi/page/0000086902.html" },
+  "枚方市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.hirakata.osaka.jp/0000029011.html" },
+  "門真市": { amount: 39000, confidence: "間接確認・要再確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.kadoma.osaka.jp/kenko_fukushi/chiiki_fukushi/23396.html" },
+  "八尾市": { amount: 39000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.yao.osaka.jp/kurashi_tetsuzuki/soudan/1003616/1019981.html" },
+  "東大阪市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.higashiosaka.lg.jp/0000002896.html" },
+  "尼崎市": { amount: 42500, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.amagasaki.hyogo.jp/kurashi/seikatusien/1001977/132juutakushien.html" }
 };
 const CHECKLISTS = {
   viewing: ["室内の携帯電波（4G/5G）","窓を閉めた時・開けた時の騒音","水回りの排水・臭い・水勢・給湯","壁・天井・窓周辺のシミ・結露・カビ","コンセントの位置と数","共用部・ゴミ置場・駐輪場の管理","駅からの道・街灯・坂・買い物導線"],
@@ -115,7 +115,7 @@ function housingReferenceHtml(p) {
     areaNote = "15㎡以下では面積条件による減額の可能性がありますが、この地域の具体額は未確認のため補正していません。";
   }
   const difference = rent - amount;
-  return `<h3>地域別の住居費参考目安</h3><div class="reference-row"><b>${escapeHtml(p.region)}</b><strong>${yen(amount)} / 月</strong></div><p class="hint">単身世帯・家賃のみの調査時点参考値。根拠の確認状況：${escapeHtml(ref.confidence)}。</p><p class="reference-status">${rent ? (difference <= 0 ? "参考目安内" : "参考目安超過") + " · 家賃との差 " + (difference > 0 ? "+" : "") + yen(difference) : "家賃未入力のため比較できません"}</p><p class="hint">${areaNote || (ref.areaRule === true ? "専有面積15㎡以下の場合は面積区分による減額に注意してください。" : "面積条件の詳細：" + ref.areaRule + "。")} 管理費・共益費・駐輪場代は参考上限の対象外で、実際の月額負担には別途加算します。</p><p class="hint">これは制度上の参考情報であり、個別の認定額・支給額・利用資格を判定するものではありません。調査基準日：2026年11月25日。</p>`;
+  return `<h3>地域別の住居費参考目安</h3><div class="reference-row"><b>${escapeHtml(p.region)}</b><strong>${yen(amount)} / 月</strong></div><p class="hint">単身世帯・家賃のみの調査時点参考値。根拠の確認状況：${escapeHtml(ref.confidence)}。</p><p class="reference-status">${rent ? (difference <= 0 ? "参考目安内" : "参考目安超過") + " · 家賃との差 " + (difference > 0 ? "+" : "") + yen(difference) : "家賃未入力のため比較できません"}</p><p class="hint">${areaNote || (ref.areaRule === true ? "専有面積15㎡以下の場合は面積区分による減額に注意してください。" : "面積条件の詳細：" + ref.areaRule + "。")} 管理費・共益費・駐輪場代は参考上限の対象外で、実際の月額負担には別途加算します。</p><p class="hint">これは制度上の参考情報であり、個別の認定額・支給額・利用資格を判定するものではありません。調査基準日：2026年11月25日。<a href="${ref.source}" target="_blank" rel="noopener">自治体の参照ページを確認</a></p>`;
 }
 function compareProperties() {
   const items = state.properties.filter(p => state.compareIds.has(p.id));

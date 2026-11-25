@@ -38,6 +38,7 @@
     <section id="propertiesPanel" class="panel">
       <div class="section-heading"><div><p class="eyebrow">PROPERTY ARCHIVE</p><h2>物件の記録</h2></div><input id="propertySearch" class="search" type="search" placeholder="物件名・地域で検索"></div>
       <div id="propertiesList" class="record-list"></div>
+      <div id="compareBar" class="compare-bar hidden"><span id="compareCount">0件選択中</span><button id="compareBtn" class="button button-dark">選択した物件を比較</button><button id="clearCompareBtn" class="mini-button">選択解除</button></div>
     </section>
     <section id="visitsPanel" class="panel hidden">
       <div class="section-heading"><div><p class="eyebrow">TOWN JOURNAL</p><h2>街の記録</h2></div></div>
@@ -58,8 +59,10 @@
       <div id="propertyFields" class="form-grid">
         <label class="wide">物件名・仮称<input id="pTitle" maxlength="120" placeholder="例：駅前のマンション（仮）"></label>
         <label class="wide">所在地・地域<input id="pAddress" maxlength="180" placeholder="市区町村・町名など"></label>
+        <label>地域（参考データ対象）<select id="pRegion"><option value="">未設定</option><option>大阪市</option><option>枚方市</option><option>門真市</option><option>八尾市</option><option>東大阪市</option><option>尼崎市</option></select></label>
         <label>賃料（円）<input id="pRent" type="number" min="0" step="1000" inputmode="numeric"></label>
         <label>管理費等（円）<input id="pFee" type="number" min="0" step="500" inputmode="numeric"></label>
+        <label>駐輪・駐車場代（円）<input id="pParking" type="number" min="0" step="100" inputmode="numeric"></label>
         <label>最寄駅<input id="pStation" maxlength="100"></label>
         <label>駅徒歩（分）<input id="pWalk" type="number" min="0" max="180"></label>
         <label>間取り<input id="pLayout" maxlength="30" placeholder="1K / 2DK など"></label>
@@ -90,6 +93,8 @@
   </dialog>
 
   <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>
+  <dialog id="compareDialog" class="dialog"><div id="compareContent"></div></dialog>
+  <dialog id="checklistDialog" class="dialog"><div id="checklistContent"></div></dialog>
   <dialog id="backupDialog" class="dialog">
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>データ管理</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
     <p class="hint">記録と画像は現在のブラウザ内に保存されています。端末変更やブラウザデータ消去に備え、定期的にバックアップしてください。</p>

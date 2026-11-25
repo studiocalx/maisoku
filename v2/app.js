@@ -1,7 +1,20 @@
 import { allRecords, saveRecord, deleteRecord, getRecord, replaceAllData, exportAllData, saveImageAsset } from "./db.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { tab: "properties", properties: [], visits: [], assets: [] };
+const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set() };
+const HOUSING_REFERENCE = {
+  "大阪市": { amount: 40000, confidence: "公式直接確認", areaRule: true },
+  "枚方市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" },
+  "門真市": { amount: 39000, confidence: "間接確認・要再確認", areaRule: "可能性あり・金額未確認" },
+  "八尾市": { amount: 39000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" },
+  "東大阪市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" },
+  "尼崎市": { amount: 42500, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認" }
+};
+const CHECKLISTS = {
+  viewing: ["室内の携帯電波（4G/5G）","窓を閉めた時・開けた時の騒音","水回りの排水・臭い・水勢・給湯","壁・天井・窓周辺のシミ・結露・カビ","コンセントの位置と数","共用部・ゴミ置場・駐輪場の管理","駅からの道・街灯・坂・買い物導線"],
+  contract: ["賃料・管理費・駐輪場等の月額総額","初期費用の明細と不要オプション","短期解約違約金の期間・金額","退去時精算・清掃・原状回復特約","更新料・保証会社更新料・引落手数料","重要事項説明書（35条書面）の確認"]
+};
+const CHECK_STATES = ["未確認","確認済み","問題あり","対象外"];
 const uid = () => crypto.randomUUID();
 const dateToday = () => new Date().toISOString().slice(0, 10);
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -36,10 +49,10 @@ function render() {
   const q = $("propertySearch").value.trim().toLowerCase();
   const properties = sortNewest(state.properties).filter(p => !q || [p.title,p.address,p.station].some(v => String(v || "").toLowerCase().includes(q)));
   $("propertiesList").innerHTML = properties.length ? properties.map(p => {
-    const total = Number(p.rent || 0) + Number(p.fee || 0);
-    return `<article class="record-card"><button class="record-main" data-detail-property="${p.id}"><span class="record-kicker">${escapeHtml(p.status || "未整理")} · ${escapeHtml((p.updatedAt || "").slice(0,10))}</span><strong>${escapeHtml(p.title || "名称未設定の物件")}</strong><span class="record-sub">${escapeHtml(p.address || "所在地未入力")}${p.station ? " / " + escapeHtml(p.station) : ""}</span><span class="record-price">${total ? yen(total) + " / 月" : "賃料未確認"}</span></button><button class="mini-button" data-edit-property="${p.id}">編集</button></article>`;
+    const total = Number(p.rent || 0) + Number(p.fee || 0) + Number(p.parkingFee || 0);
+    return `<article class="record-card"><input class="compare-check" type="checkbox" aria-label="比較対象に選択" data-compare="${p.id}" ${state.compareIds.has(p.id) ? "checked" : ""}><button class="record-main" data-detail-property="${p.id}"><span class="record-kicker">${escapeHtml(p.status || "未整理")} · ${escapeHtml((p.updatedAt || "").slice(0,10))}</span><strong>${escapeHtml(p.title || "名称未設定の物件")}</strong><span class="record-sub">${escapeHtml(p.address || "所在地未入力")}${p.station ? " / " + escapeHtml(p.station) : ""}</span><span class="record-price">${total ? yen(total) + " / 月" : "賃料未確認"}</span></button><button class="mini-button" data-edit-property="${p.id}">編集</button></article>`;
   }).join("") : emptyState("物件の記録はまだありません。","気になる物件を、まず一件残してみましょう。");
-  const visits = sortNewest(state.visits, "date");
+  $("compareBar").classList.toggle("hidden", state.compareIds.size === 0);\n  $("compareCount").textContent = state.compareIds.size + "件選択中";\n  $("compareBtn").disabled = state.compareIds.size < 2;\n  const visits = sortNewest(state.visits, "date");
   $("visitsList").innerHTML = visits.length ? visits.map(v => `<article class="record-card"><button class="record-main" data-detail-visit="${v.id}"><span class="record-kicker">${escapeHtml(v.date || "日付未設定")}</span><strong>${escapeHtml(v.place || "地域名未設定")}</strong><span class="record-sub">${escapeHtml(v.memo || "メモはありません")}</span></button><button class="mini-button" data-edit-visit="${v.id}">編集</button></article>`).join("") : emptyState("街の記録はまだありません。","物件がなくても、歩いた街の印象を残せます。");
   const assets = sortNewest(state.assets, "createdAt").filter(a => !a.propertyId);
   $("assetsList").innerHTML = assets.length ? assets.map(a => `<article class="asset-card"><img data-asset-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span><small>${escapeHtml((a.createdAt || "").slice(0,16).replace("T"," "))}</small><div class="asset-actions"><button class="mini-button" data-link-asset="${a.id}">物件に紐付け</button><button class="mini-button danger" data-delete-asset="${a.id}">削除</button></div></div></article>`).join("") : emptyState("未整理資料はありません。","撮影した画像は、物件名が分からなくても保存できます。");
@@ -64,7 +77,7 @@ function openPropertyForm(record = null) {
   $("propertyFields").classList.remove("hidden");
   $("visitFields").classList.add("hidden");
   fillVisitOptions(record?.visitId || "");
-  $("pTitle").value = record?.title || "";
+  $("pTitle").value = record?.title || "";\n  $("pRegion").value = record?.region || "";\n  $("pParking").value = record?.parkingFee ?? "";
   $("pAddress").value = record?.address || "";
   $("pRent").value = record?.rent ?? "";
   $("pFee").value = record?.fee ?? "";
@@ -89,11 +102,63 @@ function openVisitForm(record = null) {
   $("vMemo").value = record?.memo || "";
   $("recordDialog").showModal();
 }
+function housingReferenceHtml(p) {
+  if (!p.region || !HOUSING_REFERENCE[p.region]) return '<h3>地域別の住居費参考目安</h3><p class="hint">対象地域を設定すると、調査済み6市の参考値を表示します。地域が対象外の場合は金額を推測しません。</p>';
+  const ref = HOUSING_REFERENCE[p.region], rent = Number(p.rent || 0), delta = rent - ref.amount;
+  let amount = ref.amount, areaNote = "";
+  if (p.region === "大阪市" && Number(p.area) > 0 && Number(p.area) <= 15) {
+    if (p.area > 10) amount = 36000;
+    else if (p.area > 6) amount = 32000;
+    else amount = 28000;
+    areaNote = "大阪市の面積別参考額を適用（単身・調査時点）。";
+  } else if (Number(p.area) > 0 && Number(p.area) <= 15) {
+    areaNote = "15㎡以下では面積条件による減額の可能性がありますが、この地域の具体額は未確認のため補正していません。";
+  }
+  const difference = rent - amount;
+  return `<h3>地域別の住居費参考目安</h3><div class="reference-row"><b>${escapeHtml(p.region)}</b><strong>${yen(amount)} / 月</strong></div><p class="hint">単身世帯・家賃のみの調査時点参考値。根拠の確認状況：${escapeHtml(ref.confidence)}。</p><p class="reference-status">${rent ? (difference <= 0 ? "参考目安内" : "参考目安超過") + " · 家賃との差 " + (difference > 0 ? "+" : "") + yen(difference) : "家賃未入力のため比較できません"}</p><p class="hint">${areaNote || (ref.areaRule === true ? "専有面積15㎡以下の場合は面積区分による減額に注意してください。" : "面積条件の詳細：" + ref.areaRule + "。")} 管理費・共益費・駐輪場代は参考上限の対象外で、実際の月額負担には別途加算します。</p><p class="hint">これは制度上の参考情報であり、個別の認定額・支給額・利用資格を判定するものではありません。調査基準日：2026年11月25日。</p>`;
+}
+function compareProperties() {
+  const items = state.properties.filter(p => state.compareIds.has(p.id));
+  if (items.length < 2) return toast("比較する物件を2件以上選んでください。");
+  const rows = [
+    ["地域", p => p.region || "未設定"], ["所在地", p => p.address || "未確認"],
+    ["賃料", p => p.rent == null ? "未確認" : yen(p.rent)],
+    ["管理費等", p => p.fee == null ? "未確認" : yen(p.fee)],
+    ["駐輪・駐車場", p => p.parkingFee == null ? "未確認" : yen(p.parkingFee)],
+    ["月額合計", p => [p.rent,p.fee,p.parkingFee].some(v=>v!=null) ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"],
+    ["最寄駅", p => p.station || "未確認"], ["駅徒歩", p => p.walkMinutes ? p.walkMinutes+"分" : "未確認"],
+    ["間取り", p => p.layout || "未確認"], ["専有面積", p => p.area ? p.area+"㎡" : "未確認"],
+    ["検討状態", p => p.status || "未整理"], ["メモ", p => p.memo || "—"]
+  ];
+  $("compareContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">SIDE BY SIDE</p><h2>物件比較</h2></div><button class="icon-button" data-close>×</button></div><div class="compare-table-wrap"><table class="compare-table"><thead><tr><th>比較項目</th>${items.map(p=>`<th>${escapeHtml(p.title || "名称未設定")}</th>`).join("")}</tr></thead><tbody>${rows.map(([label,fn])=>`<tr><th>${label}</th>${items.map(p=>`<td>${escapeHtml(fn(p))}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="hint">未確認項目は空欄や推測で補わず、そのまま比較表示しています。点数による自動順位付けは行いません。</p><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button></div>`;
+  $("compareDialog").showModal();
+}
+async function openChecklist(propertyId, kind) {
+  const p = await getRecord("properties", propertyId);
+  if (!p) return;
+  const title = kind === "viewing" ? "内見チェック" : "契約チェック";
+  const items = CHECKLISTS[kind];
+  const saved = p.checklists?.[kind] || {};
+  $("checklistContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">${kind === "viewing" ? "VIEWING" : "CONTRACT"} CHECKLIST</p><h2>${title}</h2><p class="hint">${escapeHtml(p.title || "名称未設定の物件")}</p></div><button class="icon-button" data-close>×</button></div><div class="checklist-rows">${items.map((item,i)=>`<label class="checklist-row"><span>${escapeHtml(item)}</span><select data-check-status="${i}">${CHECK_STATES.map(s=>`<option ${(saved[i] || "未確認")===s?"selected":""}>${s}</option>`).join("")}</select><textarea data-check-note="${i}" rows="1" placeholder="メモ（任意）">${escapeHtml(saved[i+"_note"] || "")}</textarea></label>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-save-checklist="${propertyId}" data-kind="${kind}">チェック結果を保存</button></div>`;
+  $("checklistDialog").showModal();
+}
+async function saveChecklist(propertyId, kind) {
+  const p = await getRecord("properties", propertyId);
+  if (!p) return;
+  const values = {};
+  for (let i=0;i<CHECKLISTS[kind].length;i++) {
+    values[i] = $("checklistContent").querySelector(`[data-check-status="${i}"]`).value;
+    values[i+"_note"] = $("checklistContent").querySelector(`[data-check-note="${i}"]`).value;
+  }
+  p.checklists = { ...(p.checklists || {}), [kind]: values };
+  p.updatedAt = new Date().toISOString();
+  await saveRecord("properties",p); await refresh(); $("checklistDialog").close(); toast("チェック結果を保存しました。");
+}
 async function showProperty(id) {
   const p = await getRecord("properties", id);
   if (!p) return;
   const assets = state.assets.filter(a => a.propertyId === id);
-  $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY NOTE</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div><dl class="detail-grid"><dt>所在地</dt><dd>${escapeHtml(p.address || "未確認")}</dd><dt>賃料</dt><dd>${p.rent ? yen(p.rent) : "未確認"}</dd><dt>管理費等</dt><dd>${p.fee ? yen(p.fee) : "未確認"}</dd><dt>月額合計</dt><dd>${p.rent || p.fee ? yen(Number(p.rent||0)+Number(p.fee||0)) : "未確認"}</dd><dt>最寄駅</dt><dd>${escapeHtml(p.station || "未確認")}</dd><dt>徒歩</dt><dd>${p.walkMinutes ? escapeHtml(p.walkMinutes) + "分" : "未確認"}</dd><dt>間取り</dt><dd>${escapeHtml(p.layout || "未確認")}</dd><dt>面積</dt><dd>${p.area ? escapeHtml(p.area) + "㎡" : "未確認"}</dd><dt>状態</dt><dd>${escapeHtml(p.status || "未整理")}</dd></dl><p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">編集する</button></div>`;
+  $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY NOTE</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div><dl class="detail-grid"><dt>所在地</dt><dd>${escapeHtml(p.address || "未確認")}</dd><dt>地域</dt><dd>${escapeHtml(p.region || "未設定")}</dd><dt>賃料</dt><dd>${p.rent ? yen(p.rent) : "未確認"}</dd><dt>管理費等</dt><dd>${p.fee ? yen(p.fee) : "未確認"}</dd><dt>駐輪・駐車場</dt><dd>${p.parkingFee ? yen(p.parkingFee) : "未確認／不要"}</dd><dt>月額合計</dt><dd>${p.rent || p.fee || p.parkingFee ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"}</dd><dt>最寄駅</dt><dd>${escapeHtml(p.station || "未確認")}</dd><dt>徒歩</dt><dd>${p.walkMinutes ? escapeHtml(p.walkMinutes) + "分" : "未確認"}</dd><dt>間取り</dt><dd>${escapeHtml(p.layout || "未確認")}</dd><dt>面積</dt><dd>${p.area ? escapeHtml(p.area) + "㎡" : "未確認"}</dd><dt>状態</dt><dd>${escapeHtml(p.status || "未整理")}</dd></dl><section class="reference-panel">${housingReferenceHtml(p)}</section><div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">内見チェック</button><button class="mini-button" data-checklist="${p.id}" data-kind="contract">契約チェック</button></div><p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">編集する</button></div>`;
   for (const a of assets) {
     const img = document.querySelector(`[data-detail-image="${a.id}"]`);
     if (img && a.blob) img.src = URL.createObjectURL(a.blob);
@@ -112,7 +177,7 @@ async function saveForm(event) {
   const type = $("recordType").value, id = $("recordId").value || uid(), now = new Date().toISOString();
   if (type === "property") {
     const previous = await getRecord("properties", id);
-    const record = { ...previous, id, title: $("pTitle").value.trim(), address: $("pAddress").value.trim(), rent: $("pRent").value === "" ? null : Number($("pRent").value), fee: $("pFee").value === "" ? null : Number($("pFee").value), station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value), layout: $("pLayout").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value), status: $("pStatus").value, visitId: $("pVisit").value || null, memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now };
+    const record = { ...previous, id, title: $("pTitle").value.trim(), region: $("pRegion").value, parkingFee: $("pParking").value === "" ? null : Number($("pParking").value), address: $("pAddress").value.trim(), rent: $("pRent").value === "" ? null : Number($("pRent").value), fee: $("pFee").value === "" ? null : Number($("pFee").value), station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value), layout: $("pLayout").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value), status: $("pStatus").value, visitId: $("pVisit").value || null, memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now };
     await saveRecord("properties", record);
   } else {
     const previous = await getRecord("visits", id);
@@ -178,7 +243,7 @@ document.addEventListener("click", async (event) => {
   if (target.id === "visitBtn") openVisitForm();
   if (target.id === "propertyBtn") openPropertyForm();
   if (target.id === "captureBtn") $("assetDialog").showModal();
-  if (target.id === "backupBtn") $("backupDialog").showModal();
+  if (target.id === "backupBtn") $("backupDialog").showModal();\n  if (target.id === "compareBtn") compareProperties();\n  if (target.id === "clearCompareBtn") { state.compareIds.clear(); render(); }\n  if (target.dataset.checklist) await openChecklist(target.dataset.checklist,target.dataset.kind);\n  if (target.dataset.saveChecklist) await saveChecklist(target.dataset.saveChecklist,target.dataset.kind);
   if (target.id === "exportBtn") { try { await exportBackup(); } catch(e) { $("backupStatus").textContent=e.message; } }
   if (target.dataset.editProperty) { $("detailDialog").close(); openPropertyForm(state.properties.find(p=>p.id===target.dataset.editProperty)); }
   if (target.dataset.editVisit) { $("detailDialog").close(); openVisitForm(state.visits.find(v=>v.id===target.dataset.editVisit)); }

@@ -334,46 +334,6 @@ export async function onRequestPost(context) {
     }
   }
 
-  // Geminiの無料枠が全候補で尽きた場合は、設定済みのCloudflare Workers AIへ切り替える。
-  // Pages側でAI binding（変数名 AI）を追加した場合のみ実行。未設定なら課金や外部送信は発生しない。
-  if (env?.AI && typeof env.AI.run === "function") {
-    try {
-      const cfResult = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}` } }
-          ]
-        }],
-        max_tokens: 900,
-        temperature: 0.1
-      });
-      const cfText = String(cfResult?.response || cfResult?.result?.response || cfResult?.output_text || "");
-      const cfParsed = extractJsonFromText(cfText);
-      if (cfParsed && typeof cfParsed === "object") {
-        return jsonResponse({
-          ok: true,
-          model: "@cf/meta/llama-4-scout-17b-16e-instruct",
-          provider: "Cloudflare Workers AI",
-          attemptedModels,
-          data: cfParsed
-        });
-      }
-      lastError = {
-        status: 502,
-        model: "@cf/meta/llama-4-scout-17b-16e-instruct",
-        detail: "Cloudflare Workers AIの応答をJSONとして解釈できませんでした。"
-      };
-    } catch (err) {
-      lastError = {
-        status: 502,
-        model: "@cf/meta/llama-4-scout-17b-16e-instruct",
-        detail: err instanceof Error ? err.message : "Cloudflare Workers AIへの接続に失敗しました。"
-      };
-    }
-  }
-
   if (rateLimitErrors.length > 0) {
     const latest = rateLimitErrors[rateLimitErrors.length - 1];
     const categories = Array.from(new Set(rateLimitErrors.map((item) => item.category)));
@@ -385,7 +345,7 @@ export async function onRequestPost(context) {
 
     return jsonResponse({
       ok: false,
-      error: `Gemini APIの利用上限（429）です。自動で別モデルへの切替を試しましたが、解析を完了できませんでした。${summary}${env?.AI ? "" : " Cloudflare Workers AIの予備経路は未接続です（PagesのSettings > Functions > Workers AI bindingで変数名 AI を追加して再デプロイすると利用できます）。"}`,
+      error: `Gemini APIの利用上限（429）です。自動で別モデルへの切替を試しましたが、解析を完了できませんでした。${summary}`,
       diagnostic: {
         category: categoryText,
         summary,

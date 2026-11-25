@@ -235,6 +235,14 @@ async function importBackup(file) {
   await replaceAllData(parsed); await refresh(); $("backupStatus").textContent="バックアップを読み込みました。"; toast("データを復元しました。");
 }
 
+document.addEventListener("change", (event) => {
+  const el = event.target;
+  if (el.matches("[data-compare]")) {
+    if (el.checked) state.compareIds.add(el.dataset.compare);
+    else state.compareIds.delete(el.dataset.compare);
+    render();
+  }
+});
 document.addEventListener("click", async (event) => {
   const target = event.target.closest("button");
   if (!target) return;

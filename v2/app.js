@@ -197,4 +197,8 @@ $("propertySearch").addEventListener("input", render);
 $("importFile").addEventListener("change", async e => { const file=e.target.files?.[0]; if(!file)return; try{await importBackup(file);}catch(err){$("backupStatus").textContent="読み込み失敗: "+err.message;} e.target.value=""; });
 document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>b.closest("dialog")?.close()));
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
+
 try { await refresh(); } catch (error) { toast("保存領域を開けません: " + error.message); }

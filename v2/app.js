@@ -202,15 +202,30 @@ async function saveSelectedImages(files) {
   $("assetSaveStatus").textContent = saved ? `${saved}件の原画像を保存しました。` : "画像ファイルが選択されていません。";
   if (saved) { $("assetFile").value = ""; $("quickFile").value = ""; await refresh(); toast(`${saved}件の画像を保存しました。`); }
 }
-async function linkAsset(id) {
+function openAssetLink(id) {
   if (!state.properties.length) { toast("先に物件を登録してください。"); return; }
-  const choices = state.properties.map((p,i)=>`${i+1}. ${p.title || "名称未設定"} — ${p.address || "所在地未入力"}`).join("\n");
-  const answer = prompt("紐付ける物件の番号を入力してください。\n" + choices);
-  const index = Number(answer) - 1;
-  if (!Number.isInteger(index) || index < 0 || index >= state.properties.length) return;
+  const asset = state.assets.find(a => a.id === id);
+  if (!asset) { toast("資料が見つかりません。"); return; }
+  $("assetLinkId").value = id;
+  $("assetLinkProperty").innerHTML = state.properties.map(p =>
+    `<option value="${escapeHtml(p.id)}">${escapeHtml(p.title || "名称未設定")} — ${escapeHtml(p.address || "所在地未入力")}</option>`
+  ).join("");
+  $("assetLinkDialog").showModal();
+}
+async function saveAssetLink(event) {
+  event.preventDefault();
+  const id = $("assetLinkId").value;
+  const propertyId = $("assetLinkProperty").value;
   const asset = await getRecord("assets", id);
-  asset.propertyId = state.properties[index].id;
-  await saveRecord("assets", asset); await refresh(); toast("物件に資料を紐付けました。");
+  if (!asset || !state.properties.some(p => p.id === propertyId)) {
+    toast("資料または物件を確認できませんでした。");
+    return;
+  }
+  asset.propertyId = propertyId;
+  await saveRecord("assets", asset);
+  $("assetLinkDialog").close();
+  await refresh();
+  toast("物件に資料を紐付けました。");
 }
 async function exportBackup() {
   const data = await exportAllData();
@@ -266,12 +281,13 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.editVisit) { $("detailDialog").close(); openVisitForm(state.visits.find(v=>v.id===target.dataset.editVisit)); }
   if (target.dataset.detailProperty) await showProperty(target.dataset.detailProperty);
   if (target.dataset.detailVisit) await showVisit(target.dataset.detailVisit);
-  if (target.dataset.linkAsset) await linkAsset(target.dataset.linkAsset);
+  if (target.dataset.linkAsset) openAssetLink(target.dataset.linkAsset);
   if (target.dataset.deleteAsset) {
     if (confirm("この資料画像を削除しますか？")) { await deleteRecord("assets",target.dataset.deleteAsset); await refresh(); toast("資料を削除しました。"); }
   }
 });
 $("recordForm").addEventListener("submit", saveForm);
+$("assetLinkForm").addEventListener("submit", async e => { try { await saveAssetLink(e); } catch (err) { toast("紐付けに失敗しました: " + err.message); } });
 $("assetForm").addEventListener("submit", async e => { e.preventDefault(); try { await saveSelectedImages([...$("assetFile").files]); } catch(err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; } });
 $("assetFile").addEventListener("change", () => { $("assetSaveStatus").textContent = $("assetFile").files.length ? `${$("assetFile").files.length}件を選択中。保存ボタンで原画像を保存します。` : ""; });
 $("quickFile").addEventListener("change", async () => { try { await saveSelectedImages([...$("quickFile").files]); } catch(e) { toast("保存失敗: " + e.message); } });

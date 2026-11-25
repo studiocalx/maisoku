@@ -15,20 +15,16 @@ function jsonResponse(payload, status = 200, extraHeaders = {}) {
 function scoreFlashModel(name) {
   const lower = name.toLowerCase();
   if (!lower.includes("flash")) return -1;
-  if (lower.includes("audio") || lower.includes("live") || lower.includes("embedding")) {
-    return -1;
-  }
-  let score = 10;
-  if (lower.includes("2.5")) score += 50;
-  else if (lower.includes("2.0")) score += 40;
-  else if (lower.includes("1.5")) score += 30;
+  if (/(audio|live|embedding|image)/.test(lower)) return -1;
+  if (/(preview|experimental|exp-)/.test(lower)) return -1;
 
-  if (!lower.includes("exp") && !lower.includes("preview") && !lower.includes("lite")) {
-    score += 15;
-  } else if (lower.includes("lite")) {
-    score += 5;
-  }
-  return score;
+  const version = lower.match(/gemini-(\d+)\.(\d+)-flash/);
+  if (!version) return -1;
+
+  const major = Number(version[1]);
+  const minor = Number(version[2]);
+  // Stable Flash models first; Lite is a useful lower-cost fallback.
+  return major * 1000 + minor * 10 + (lower.includes("lite") ? 0 : 5);
 }
 
 async function getCandidateModels(apiKey, ctx) {
@@ -39,60 +35,113 @@ async function getCandidateModels(apiKey, ctx) {
     const cached = await cache.match(cacheRequest);
     if (cached) {
       const data = await cached.json();
-      if (Array.isArray(data?.models) && data.models.length > 0) {
-        return data.models;
-      }
+      if (Array.isArray(data?.models) && data.models.length > 0) return data.models;
     }
   } catch {
-    // キャッシュ読み取り失敗時はフォールバックへ進む
+    // キャッシュが読めない場合はモデル一覧を再取得
   }
 
+  // APIのモデル一覧取得に失敗した場合のみ使用する保険候補。
+  // 2.0 / 1.5系は終了済みのため候補に含めない。
   const fallbackDefaults = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash"
   ];
 
   try {
-    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+    const listUrl = \`https://generativelanguage.googleapis.com/v1beta/models?key=\${encodeURIComponent(apiKey)}\`;
     const res = await fetch(listUrl, { method: "GET" });
-    if (!res.ok) {
-      return fallbackDefaults;
-    }
+    if (!res.ok) return fallbackDefaults;
 
     const data = await res.json();
     const models = Array.isArray(data?.models) ? data.models : [];
-
     const ranked = models
-      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+      .filter((m) =>
+        Array.isArray(m.supportedGenerationMethods) &&
+        m.supportedGenerationMethods.includes("generateContent")
+      )
       .map((m) => ({
         id: String(m.name || "").replace(/^models\//, ""),
-        score: scoreFlashModel(String(m.name || "")),
+        score: scoreFlashModel(String(m.name || ""))
       }))
       .filter((m) => m.id && m.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((m) => m.id);
 
-    const uniqueModels = Array.from(new Set([...ranked, ...fallbackDefaults])).slice(0, 4);
-
-    if (uniqueModels.length > 0) {
-      const cacheRes = new Response(JSON.stringify({ models: uniqueModels }), {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}`,
-        },
-      });
-      if (ctx && typeof ctx.waitUntil === "function") {
-        ctx.waitUntil(cache.put(cacheRequest, cacheRes));
-      } else {
-        await cache.put(cacheRequest, cacheRes);
+    const uniqueModels = Array.from(new Set([...ranked, ...fallbackDefaults])).slice(0, 5);
+    const cacheRes = new Response(JSON.stringify({ models: uniqueModels }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": \`public, max-age=\${CACHE_TTL_SECONDS}\`
       }
-    }
+    });
 
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(cache.put(cacheRequest, cacheRes));
+    } else {
+      await cache.put(cacheRequest, cacheRes);
+    }
     return uniqueModels;
   } catch {
     return fallbackDefaults;
   }
+}
+
+function diagnoseGeminiError(errorBody, httpStatus) {
+  const apiError = errorBody?.error || {};
+  const details = Array.isArray(apiError.details) ? apiError.details : [];
+  const quotaFailure = details.find((item) =>
+    String(item?.["@type"] || "").includes("QuotaFailure")
+  );
+  const violation = quotaFailure?.violations?.[0] || {};
+  const retryInfo = details.find((item) =>
+    String(item?.["@type"] || "").includes("RetryInfo")
+  );
+
+  const quotaId = String(violation.quotaId || "");
+  const metric = String(violation.quotaMetric || "");
+  const message = String(apiError.message || errorBody?.message || "詳細なエラー理由は返されませんでした。");
+  const retryDelay = String(retryInfo?.retryDelay || "");
+
+  let category = "原因特定不能";
+  let explanation = "Gemini APIの利用枠または一時的な処理容量に達した可能性があります。";
+
+  if (/RequestsPerMinute|requests_per_minute|RPM/i.test(quotaId + " " + metric)) {
+    category = "RPM制限（1分あたりのリクエスト上限）";
+    explanation = "短時間に送信できるリクエスト数の上限です。少し時間をおいて再試行してください。";
+  } else if (/TokensPerMinute|tokens_per_minute|TPM/i.test(quotaId + " " + metric)) {
+    category = "TPM制限（1分あたりの処理トークン上限）";
+    explanation = "短時間に処理できるトークン量の上限です。画像サイズや送信頻度を抑えて再試行してください。";
+  } else if (/RequestsPerDay|requests_per_day|RPD/i.test(quotaId + " " + metric)) {
+    category = "RPD制限（1日あたりのリクエスト上限）";
+    explanation = "このモデルの1日あたりの利用上限です。別モデルの利用枠が残っていれば自動切替を試し、全候補で上限の場合はリセットを待つ必要があります。";
+  } else if (/billing|payment|spend|cost/i.test(message + " " + quotaId + " " + metric)) {
+    category = "課金・プロジェクト利用枠";
+    explanation = "課金設定またはプロジェクト全体の利用枠を確認してください。別モデルへの切替だけでは解消しない場合があります。";
+  } else if (/RESOURCE_EXHAUSTED/i.test(String(apiError.status || "")) || httpStatus === 429) {
+    explanation = "Google側からRESOURCE_EXHAUSTEDが返されています。レスポンスに上限の種類が含まれていないため、AI StudioのRate limitsでプロジェクト・モデル別の使用量を確認してください。";
+  }
+
+  const retryText = retryDelay ? \` Google指定の再試行目安: \${retryDelay}.\` : "";
+  const quotaText = quotaId ? \` quotaId: \${quotaId}.\` : "";
+  return {
+    category,
+    summary: \`\${category}: \${explanation}\${retryText}\${quotaText}\`,
+    providerMessage: message,
+    quotaId: quotaId || null,
+    quotaMetric: metric || null,
+    quotaValue: violation.quotaValue || null,
+    retryDelay: retryDelay || null,
+    providerStatus: apiError.status || null
+  };
+}
+
+async function readGeminiError(response) {
+  const raw = await response.text().catch(() => "");
+  let body = {};
+  try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
+  return { body, raw, diagnostic: diagnoseGeminiError(body, response.status) };
 }
 
 function buildPrompt() {
@@ -187,66 +236,63 @@ export async function onRequestPost(context) {
   const prompt = buildPrompt();
   let lastError = null;
 
+  const attemptedModels = [];
+  const rateLimitErrors = [];
+  let lastError = null;
+
   for (const modelId of candidates) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    attemptedModels.push(modelId);
+    const endpoint = \`https://generativelanguage.googleapis.com/v1beta/models/\${encodeURIComponent(modelId)}:generateContent?key=\${encodeURIComponent(apiKey)}\`;
 
     try {
       const geminiRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: prompt },
-                {
-                  inlineData: {
-                    mimeType,
-                    data: base64Data,
-                  },
-                },
-              ],
-            },
-          ],
+          contents: [{
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType, data: base64Data } }
+            ]
+          }],
           generationConfig: {
             temperature: 0.1,
-            responseMimeType: "application/json",
-          },
-        }),
+            responseMimeType: "application/json"
+          }
+        })
       });
 
       if (geminiRes.status === 403) {
-        return jsonResponse(
-          {
-            ok: false,
-            error: "Gemini APIキーの認証または権限エラー（403）です。APIキーと課金・利用制限を確認してください。",
-            model: modelId,
-          },
-          403
-        );
+        const errorInfo = await readGeminiError(geminiRes);
+        return jsonResponse({
+          ok: false,
+          error: "Gemini APIの認証・権限エラー（403）です。APIキー、APIの有効化、プロジェクト設定を確認してください。",
+          model: modelId,
+          providerMessage: errorInfo.diagnostic.providerMessage
+        }, 403);
       }
 
       if (geminiRes.status === 429) {
-        return jsonResponse(
-          {
-            ok: false,
-            error: "Gemini APIの利用制限（429）に達しました。時間をおいて再試行してください。",
-            model: modelId,
-          },
-          429
-        );
+        const errorInfo = await readGeminiError(geminiRes);
+        rateLimitErrors.push({ model: modelId, ...errorInfo.diagnostic });
+        lastError = {
+          status: 429,
+          model: modelId,
+          detail: errorInfo.diagnostic.providerMessage
+        };
+        // 429で即終了せず、モデルごとの利用枠が残っている可能性に賭けて次候補へ。
+        continue;
       }
 
       if (!geminiRes.ok) {
-        const errText = await geminiRes.text().catch(() => "");
+        const errorInfo = await readGeminiError(geminiRes);
         lastError = {
           status: geminiRes.status,
           model: modelId,
-          detail: errText.slice(0, 300),
+          detail: errorInfo.diagnostic.providerMessage || errorInfo.raw.slice(0, 500)
         };
-        // 404 やモデル未対応系は次候補へフォールバック
-        if (geminiRes.status === 404 || geminiRes.status === 400 || geminiRes.status >= 500) {
+        if (geminiRes.status === 400 || geminiRes.status === 404 || geminiRes.status >= 500) {
           continue;
         }
         break;
@@ -261,7 +307,7 @@ export async function onRequestPost(context) {
         lastError = {
           status: 502,
           model: modelId,
-          detail: "AI応答をJSONとして解釈できませんでした。",
+          detail: "AI応答をJSONとして解釈できませんでした。"
         };
         continue;
       }
@@ -269,18 +315,53 @@ export async function onRequestPost(context) {
       return jsonResponse({
         ok: true,
         model: modelId,
-        data: parsed,
+        attemptedModels,
+        data: parsed
       });
     } catch (err) {
       lastError = {
         status: 500,
         model: modelId,
-        detail: err instanceof Error ? err.message : "通信エラーが発生しました。",
+        detail: err instanceof Error ? err.message : "通信エラーが発生しました。"
       };
       continue;
     }
   }
 
+  if (rateLimitErrors.length > 0) {
+    const latest = rateLimitErrors[rateLimitErrors.length - 1];
+    const categories = Array.from(new Set(rateLimitErrors.map((item) => item.category)));
+    const categoryText = categories.join(" / ");
+    const allModels = attemptedModels.join(", ");
+    const summary = rateLimitErrors.length === 1
+      ? latest.summary
+      : \`試したモデルすべてで429になりました（\${categoryText}）。\${latest.summary}\`;
+
+    return jsonResponse({
+      ok: false,
+      error: \`Gemini APIの利用上限（429）です。自動で別モデルへの切替を試しましたが、解析を完了できませんでした。\${summary}\`,
+      diagnostic: {
+        category: categoryText,
+        summary,
+        providerMessage: latest.providerMessage,
+        quotaId: latest.quotaId,
+        quotaMetric: latest.quotaMetric,
+        quotaValue: latest.quotaValue,
+        retryDelay: latest.retryDelay,
+        modelsAttempted: attemptedModels
+      },
+      lastError,
+      modelsAttempted: attemptedModels
+    }, 429);
+  }
+
+  return jsonResponse({
+    ok: false,
+    error: "利用可能なGeminiモデルで解析を完了できませんでした。",
+    lastError,
+    modelsAttempted: attemptedModels
+  }, 502);
+}
   return jsonResponse(
     {
       ok: false,

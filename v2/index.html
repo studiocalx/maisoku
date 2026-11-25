@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#20231e">
+  <meta name="description" content="旅先で出会った街と住まいの候補を、ゆっくり記録・比較する個人用ツール。">
+  <title>マイソクAI 2.0</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><span class="brand-mark">M</span><span>マイソクAI <small>2.0 / FIELD NOTES</small></span></a>
+    <button id="backupBtn" class="button button-quiet">データ管理</button>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <p class="eyebrow">A SLOW JOURNEY TO FIND A HOME</p>
+      <h1>住まい探しを、<br>急がず、残していく。</h1>
+      <p class="intro-copy">街で見つけた物件も、歩いて感じたことも。まず記録して、あとから考える。</p>
+    </section>
+    <section class="quick-actions">
+      <button id="captureBtn" class="action-card action-primary"><span class="action-icon">＋</span><span><b>資料を撮影・保存</b><small>物件名が分からなくても大丈夫</small></span></button>
+      <button id="visitBtn" class="action-card"><span class="action-icon">↗</span><span><b>街の訪問記録</b><small>物件がなくても街だけ記録</small></span></button>
+      <button id="propertyBtn" class="action-card"><span class="action-icon">⌂</span><span><b>物件を登録</b><small>手入力で候補を追加</small></span></button>
+    </section>
+    <section class="stats" aria-label="登録件数">
+      <div><strong id="propertyCount">0</strong><span>物件</span></div>
+      <div><strong id="visitCount">0</strong><span>訪問した街</span></div>
+      <div><strong id="assetCount">0</strong><span>未整理資料</span></div>
+    </section>
+    <nav class="tabs" aria-label="表示切替">
+      <button class="tab active" data-tab="properties">物件</button>
+      <button class="tab" data-tab="visits">街の記録</button>
+      <button class="tab" data-tab="assets">未整理資料</button>
+    </nav>
+    <section id="propertiesPanel" class="panel">
+      <div class="section-heading"><div><p class="eyebrow">PROPERTY ARCHIVE</p><h2>物件の記録</h2></div><input id="propertySearch" class="search" type="search" placeholder="物件名・地域で検索"></div>
+      <div id="propertiesList" class="record-list"></div>
+    </section>
+    <section id="visitsPanel" class="panel hidden">
+      <div class="section-heading"><div><p class="eyebrow">TOWN JOURNAL</p><h2>街の記録</h2></div></div>
+      <div id="visitsList" class="record-list"></div>
+    </section>
+    <section id="assetsPanel" class="panel hidden">
+      <div class="section-heading"><div><p class="eyebrow">INBOX</p><h2>未整理資料</h2></div></div>
+      <p class="hint">撮影した原画像は、このブラウザ内に保存されます。クラウドや端末の写真フォルダへ自動同期はされません。</p>
+      <div id="assetsList" class="asset-grid"></div>
+    </section>
+    <footer>マイソクAI 2.0 — 自分のペースで、住まいと街を記録する。</footer>
+  </main>
+
+  <dialog id="recordDialog" class="dialog">
+    <form id="recordForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow" id="formEyebrow">NEW RECORD</p><h2 id="formTitle">物件を登録</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
+      <input type="hidden" id="recordId"><input type="hidden" id="recordType">
+      <div id="propertyFields" class="form-grid">
+        <label class="wide">物件名・仮称<input id="pTitle" maxlength="120" placeholder="例：駅前のマンション（仮）"></label>
+        <label class="wide">所在地・地域<input id="pAddress" maxlength="180" placeholder="市区町村・町名など"></label>
+        <label>賃料（円）<input id="pRent" type="number" min="0" step="1000" inputmode="numeric"></label>
+        <label>管理費等（円）<input id="pFee" type="number" min="0" step="500" inputmode="numeric"></label>
+        <label>最寄駅<input id="pStation" maxlength="100"></label>
+        <label>駅徒歩（分）<input id="pWalk" type="number" min="0" max="180"></label>
+        <label>間取り<input id="pLayout" maxlength="30" placeholder="1K / 2DK など"></label>
+        <label>専有面積（㎡）<input id="pArea" type="number" min="0" step="0.1"></label>
+        <label>検討状態<select id="pStatus"><option>未整理</option><option>検討中</option><option>保留</option><option>候補外</option></select></label>
+        <label>訪問記録<select id="pVisit"><option value="">紐付けなし</option></select></label>
+        <label class="wide">メモ<textarea id="pMemo" rows="3" placeholder="不動産店で聞いたこと、気になった点など"></textarea></label>
+      </div>
+      <div id="visitFields" class="form-grid hidden">
+        <label>訪問日<input id="vDate" type="date"></label>
+        <label>街・地域名<input id="vPlace" maxlength="120" placeholder="例：八尾・近鉄八尾周辺"></label>
+        <label class="wide">街の印象・気づき<textarea id="vMemo" rows="5" placeholder="商店街、買い物、病院、坂道、街の雰囲気など"></textarea></label>
+      </div>
+      <div class="dialog-actions"><button type="button" class="button button-quiet" data-close>キャンセル</button><button type="submit" class="button button-dark">保存する</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="assetDialog" class="dialog">
+    <form id="assetForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">SAVE ORIGINAL FIRST</p><h2>資料を保存</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
+      <p class="hint">画像を選ぶと、まず原画像をこのブラウザ内に保存します。物件名や詳細入力は後回しにできます。</p>
+      <label class="upload-zone">カメラで撮影／画像を選択<input id="assetFile" type="file" accept="image/*" capture="environment" multiple></label>
+      <label>資料の種類<select id="assetKind"><option>マイソク</option><option>間取り図</option><option>周辺地図</option><option>店頭掲示</option><option>その他</option></select></label>
+      <label>ひとことメモ<textarea id="assetMemo" rows="2" placeholder="店名、聞いた話など（任意）"></textarea></label>
+      <div id="assetSaveStatus" class="status-line" aria-live="polite"></div>
+      <div class="dialog-actions"><button type="button" class="button button-quiet" data-close>閉じる</button><button type="submit" class="button button-dark">選択画像を保存</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>
+  <dialog id="backupDialog" class="dialog">
+    <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>データ管理</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
+    <p class="hint">記録と画像は現在のブラウザ内に保存されています。端末変更やブラウザデータ消去に備え、定期的にバックアップしてください。</p>
+    <button id="exportBtn" class="button button-dark full">全データをバックアップ</button>
+    <label class="upload-zone">バックアップを読み込む<input id="importFile" type="file" accept="application/json,.json"></label>
+    <p id="backupStatus" class="status-line" aria-live="polite"></p>
+  </dialog>
+  <input id="quickFile" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -23,6 +23,8 @@ function scoreFlashModel(name) {
 
   const major = Number(version[1]);
   const minor = Number(version[2]);
+  // 2.0 / 1.5以前の終了済み世代を候補から除外する。
+  if (major < 2 || (major === 2 && minor < 5)) return -1;
   // Stable Flash models first; Lite is a useful lower-cost fallback.
   return major * 1000 + minor * 10 + (lower.includes("lite") ? 0 : 5);
 }
@@ -110,7 +112,7 @@ function diagnoseGeminiError(errorBody, httpStatus) {
   if (/RequestsPerMinute|requests_per_minute|RPM/i.test(quotaId + " " + metric)) {
     category = "RPM制限（1分あたりのリクエスト上限）";
     explanation = "短時間に送信できるリクエスト数の上限です。少し時間をおいて再試行してください。";
-  } else if (/TokensPerMinute|tokens_per_minute|TPM/i.test(quotaId + " " + metric)) {
+  } else if (/Tokens.*PerMinute|PerMinute.*Tokens|tokens_per_minute|TPM/i.test(quotaId + " " + metric)) {
     category = "TPM制限（1分あたりの処理トークン上限）";
     explanation = "短時間に処理できるトークン量の上限です。画像サイズや送信頻度を抑えて再試行してください。";
   } else if (/RequestsPerDay|requests_per_day|RPD/i.test(quotaId + " " + metric)) {

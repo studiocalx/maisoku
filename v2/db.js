@@ -60,17 +60,21 @@ export async function deleteRecord(storeName, id) {
     tx.objectStore(storeName).delete(id);
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { const error = tx.error; db.close(); reject(error); };
+    tx.onabort = () => { const error = tx.error; db.close(); reject(error); };
   });
 }
 
 export async function getRecord(storeName, id) {
+  if (!STORES.includes(storeName)) throw new Error("不正な参照先です。");
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readonly");
     const req = tx.objectStore(storeName).get(id);
     req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => { const error = req.error; db.close(); reject(error); };
     tx.oncomplete = () => db.close();
+    tx.onerror = () => { const error = tx.error; db.close(); reject(error); };
+    tx.onabort = () => { const error = tx.error; db.close(); reject(error); };
   });
 }
 

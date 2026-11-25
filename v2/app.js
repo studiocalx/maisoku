@@ -16,10 +16,13 @@ const CHECKLISTS = {
 };
 const CHECK_STATES = ["未確認","確認済み","問題あり","対象外"];
 const uid = () => crypto.randomUUID();
-const dateToday = () => new Date().toISOString().slice(0, 10);
+const dateToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 const yen = (value) => Number(value || 0).toLocaleString("ja-JP") + "円";
 let toastTimer;
+let listObjectUrls = [];
+let detailObjectUrls = [];
+function clearObjectUrls(urls) { for (const url of urls) URL.revokeObjectURL(url); urls.length = 0; }
 
 function toast(message) {
   $("toast").textContent = message;
@@ -46,6 +49,7 @@ function setTab(tab) {
   render();
 }
 function render() {
+  clearObjectUrls(listObjectUrls);
   const q = $("propertySearch").value.trim().toLowerCase();
   const properties = sortNewest(state.properties).filter(p => !q || [p.title,p.address,p.station].some(v => String(v || "").toLowerCase().includes(q)));
   $("propertiesList").innerHTML = properties.length ? properties.map(p => {
@@ -61,7 +65,7 @@ function render() {
   $("assetsList").innerHTML = assets.length ? assets.map(a => `<article class="asset-card"><img data-asset-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span><small>${escapeHtml((a.createdAt || "").slice(0,16).replace("T"," "))}</small><div class="asset-actions"><button class="mini-button" data-link-asset="${a.id}">物件に紐付け</button><button class="mini-button danger" data-delete-asset="${a.id}">削除</button></div></div></article>`).join("") : emptyState("未整理資料はありません。","撮影した画像は、物件名が分からなくても保存できます。");
   for (const asset of assets) {
     const img = document.querySelector(`[data-asset-image="${asset.id}"]`);
-    if (img && asset.blob) img.src = URL.createObjectURL(asset.blob);
+    if (img && asset.blob) { const url = URL.createObjectURL(asset.blob); listObjectUrls.push(url); img.src = url; }
   }
 }
 function emptyState(title, sub) {
@@ -160,13 +164,14 @@ async function saveChecklist(propertyId, kind) {
   await saveRecord("properties",p); await refresh(); $("checklistDialog").close(); toast("チェック結果を保存しました。");
 }
 async function showProperty(id) {
+  clearObjectUrls(detailObjectUrls);
   const p = await getRecord("properties", id);
   if (!p) return;
   const assets = state.assets.filter(a => a.propertyId === id);
   $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY NOTE</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div><dl class="detail-grid"><dt>所在地</dt><dd>${escapeHtml(p.address || "未確認")}</dd><dt>地域</dt><dd>${escapeHtml(p.region || "未設定")}</dd><dt>賃料</dt><dd>${p.rent ? yen(p.rent) : "未確認"}</dd><dt>管理費等</dt><dd>${p.fee ? yen(p.fee) : "未確認"}</dd><dt>駐輪・駐車場</dt><dd>${p.parkingFee ? yen(p.parkingFee) : "未確認／不要"}</dd><dt>月額合計</dt><dd>${p.rent || p.fee || p.parkingFee ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"}</dd><dt>最寄駅</dt><dd>${escapeHtml(p.station || "未確認")}</dd><dt>徒歩</dt><dd>${p.walkMinutes ? escapeHtml(p.walkMinutes) + "分" : "未確認"}</dd><dt>間取り</dt><dd>${escapeHtml(p.layout || "未確認")}</dd><dt>面積</dt><dd>${p.area ? escapeHtml(p.area) + "㎡" : "未確認"}</dd><dt>状態</dt><dd>${escapeHtml(p.status || "未整理")}</dd></dl><section class="reference-panel">${housingReferenceHtml(p)}</section><div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">内見チェック</button><button class="mini-button" data-checklist="${p.id}" data-kind="contract">契約チェック</button></div><p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">編集する</button></div>`;
   for (const a of assets) {
     const img = document.querySelector(`[data-detail-image="${a.id}"]`);
-    if (img && a.blob) img.src = URL.createObjectURL(a.blob);
+    if (img && a.blob) { const url = URL.createObjectURL(a.blob); detailObjectUrls.push(url); img.src = url; }
   }
   $("detailDialog").showModal();
 }
@@ -233,7 +238,7 @@ async function exportBackup() {
   const enriched = { ...data, assets: await Promise.all(data.assets.map(async a => ({ ...a, blobData: await blobToDataUrl(a.blob), blob: undefined }))) };
   const blob = new Blob([JSON.stringify(enriched)], {type:"application/json"});
   const url = URL.createObjectURL(blob), a = document.createElement("a");
-  a.href = url; a.download = `maisoku-ai-backup-${dateToday()}.json`; a.click(); URL.revokeObjectURL(url);
+  a.href = url; a.download = `maisoku-ai-backup-${dateToday()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   $("backupStatus").textContent = "バックアップを書き出しました。";
 }
 function blobToDataUrl(blob) {
@@ -286,6 +291,7 @@ document.addEventListener("click", async (event) => {
     if (confirm("この資料画像を削除しますか？")) { await deleteRecord("assets",target.dataset.deleteAsset); await refresh(); toast("資料を削除しました。"); }
   }
 });
+$("detailDialog").addEventListener("close", () => clearObjectUrls(detailObjectUrls));
 $("recordForm").addEventListener("submit", saveForm);
 $("assetLinkForm").addEventListener("submit", async e => { try { await saveAssetLink(e); } catch (err) { toast("紐付けに失敗しました: " + err.message); } });
 $("assetForm").addEventListener("submit", async e => { e.preventDefault(); try { await saveSelectedImages([...$("assetFile").files]); } catch(err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; } });

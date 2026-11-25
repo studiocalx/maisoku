@@ -52,7 +52,10 @@ function render() {
     const total = Number(p.rent || 0) + Number(p.fee || 0) + Number(p.parkingFee || 0);
     return `<article class="record-card"><input class="compare-check" type="checkbox" aria-label="比較対象に選択" data-compare="${p.id}" ${state.compareIds.has(p.id) ? "checked" : ""}><button class="record-main" data-detail-property="${p.id}"><span class="record-kicker">${escapeHtml(p.status || "未整理")} · ${escapeHtml((p.updatedAt || "").slice(0,10))}</span><strong>${escapeHtml(p.title || "名称未設定の物件")}</strong><span class="record-sub">${escapeHtml(p.address || "所在地未入力")}${p.station ? " / " + escapeHtml(p.station) : ""}</span><span class="record-price">${total ? yen(total) + " / 月" : "賃料未確認"}</span></button><button class="mini-button" data-edit-property="${p.id}">編集</button></article>`;
   }).join("") : emptyState("物件の記録はまだありません。","気になる物件を、まず一件残してみましょう。");
-  $("compareBar").classList.toggle("hidden", state.compareIds.size === 0);\n  $("compareCount").textContent = state.compareIds.size + "件選択中";\n  $("compareBtn").disabled = state.compareIds.size < 2;\n  const visits = sortNewest(state.visits, "date");
+  $("compareBar").classList.toggle("hidden", state.compareIds.size === 0);
+  $("compareCount").textContent = state.compareIds.size + "件選択中";
+  $("compareBtn").disabled = state.compareIds.size < 2;
+  const visits = sortNewest(state.visits, "date");
   $("visitsList").innerHTML = visits.length ? visits.map(v => `<article class="record-card"><button class="record-main" data-detail-visit="${v.id}"><span class="record-kicker">${escapeHtml(v.date || "日付未設定")}</span><strong>${escapeHtml(v.place || "地域名未設定")}</strong><span class="record-sub">${escapeHtml(v.memo || "メモはありません")}</span></button><button class="mini-button" data-edit-visit="${v.id}">編集</button></article>`).join("") : emptyState("街の記録はまだありません。","物件がなくても、歩いた街の印象を残せます。");
   const assets = sortNewest(state.assets, "createdAt").filter(a => !a.propertyId);
   $("assetsList").innerHTML = assets.length ? assets.map(a => `<article class="asset-card"><img data-asset-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span><small>${escapeHtml((a.createdAt || "").slice(0,16).replace("T"," "))}</small><div class="asset-actions"><button class="mini-button" data-link-asset="${a.id}">物件に紐付け</button><button class="mini-button danger" data-delete-asset="${a.id}">削除</button></div></div></article>`).join("") : emptyState("未整理資料はありません。","撮影した画像は、物件名が分からなくても保存できます。");
@@ -77,7 +80,9 @@ function openPropertyForm(record = null) {
   $("propertyFields").classList.remove("hidden");
   $("visitFields").classList.add("hidden");
   fillVisitOptions(record?.visitId || "");
-  $("pTitle").value = record?.title || "";\n  $("pRegion").value = record?.region || "";\n  $("pParking").value = record?.parkingFee ?? "";
+  $("pTitle").value = record?.title || "";
+  $("pRegion").value = record?.region || "";
+  $("pParking").value = record?.parkingFee ?? "";
   $("pAddress").value = record?.address || "";
   $("pRent").value = record?.rent ?? "";
   $("pFee").value = record?.fee ?? "";
@@ -251,7 +256,11 @@ document.addEventListener("click", async (event) => {
   if (target.id === "visitBtn") openVisitForm();
   if (target.id === "propertyBtn") openPropertyForm();
   if (target.id === "captureBtn") $("assetDialog").showModal();
-  if (target.id === "backupBtn") $("backupDialog").showModal();\n  if (target.id === "compareBtn") compareProperties();\n  if (target.id === "clearCompareBtn") { state.compareIds.clear(); render(); }\n  if (target.dataset.checklist) await openChecklist(target.dataset.checklist,target.dataset.kind);\n  if (target.dataset.saveChecklist) await saveChecklist(target.dataset.saveChecklist,target.dataset.kind);
+  if (target.id === "backupBtn") $("backupDialog").showModal();
+  if (target.id === "compareBtn") compareProperties();
+  if (target.id === "clearCompareBtn") { state.compareIds.clear(); render(); }
+  if (target.dataset.checklist) await openChecklist(target.dataset.checklist,target.dataset.kind);
+  if (target.dataset.saveChecklist) await saveChecklist(target.dataset.saveChecklist,target.dataset.kind);
   if (target.id === "exportBtn") { try { await exportBackup(); } catch(e) { $("backupStatus").textContent=e.message; } }
   if (target.dataset.editProperty) { $("detailDialog").close(); openPropertyForm(state.properties.find(p=>p.id===target.dataset.editProperty)); }
   if (target.dataset.editVisit) { $("detailDialog").close(); openVisitForm(state.visits.find(v=>v.id===target.dataset.editVisit)); }

@@ -50,7 +50,7 @@ async function getCandidateModels(apiKey, ctx) {
   ];
 
   try {
-    const listUrl = \`https://generativelanguage.googleapis.com/v1beta/models?key=\${encodeURIComponent(apiKey)}\`;
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
     const res = await fetch(listUrl, { method: "GET" });
     if (!res.ok) return fallbackDefaults;
 
@@ -73,7 +73,7 @@ async function getCandidateModels(apiKey, ctx) {
     const cacheRes = new Response(JSON.stringify({ models: uniqueModels }), {
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": \`public, max-age=\${CACHE_TTL_SECONDS}\`
+        "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}`
       }
     });
 
@@ -123,11 +123,11 @@ function diagnoseGeminiError(errorBody, httpStatus) {
     explanation = "Google側からRESOURCE_EXHAUSTEDが返されています。レスポンスに上限の種類が含まれていないため、AI StudioのRate limitsでプロジェクト・モデル別の使用量を確認してください。";
   }
 
-  const retryText = retryDelay ? \` Google指定の再試行目安: \${retryDelay}.\` : "";
-  const quotaText = quotaId ? \` quotaId: \${quotaId}.\` : "";
+  const retryText = retryDelay ? ` Google指定の再試行目安: ${retryDelay}.` : "";
+  const quotaText = quotaId ? ` quotaId: ${quotaId}.` : "";
   return {
     category,
-    summary: \`\${category}: \${explanation}\${retryText}\${quotaText}\`,
+    summary: `${category}: ${explanation}${retryText}${quotaText}`,
     providerMessage: message,
     quotaId: quotaId || null,
     quotaMetric: metric || null,
@@ -234,7 +234,6 @@ export async function onRequestPost(context) {
 
   const candidates = await getCandidateModels(apiKey, context);
   const prompt = buildPrompt();
-  let lastError = null;
 
   const attemptedModels = [];
   const rateLimitErrors = [];
@@ -242,7 +241,7 @@ export async function onRequestPost(context) {
 
   for (const modelId of candidates) {
     attemptedModels.push(modelId);
-    const endpoint = \`https://generativelanguage.googleapis.com/v1beta/models/\${encodeURIComponent(modelId)}:generateContent?key=\${encodeURIComponent(apiKey)}\`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     try {
       const geminiRes = await fetch(endpoint, {
@@ -335,11 +334,11 @@ export async function onRequestPost(context) {
     const allModels = attemptedModels.join(", ");
     const summary = rateLimitErrors.length === 1
       ? latest.summary
-      : \`試したモデルすべてで429になりました（\${categoryText}）。\${latest.summary}\`;
+      : `試したモデルすべてで429になりました（${categoryText}）。${latest.summary}`;
 
     return jsonResponse({
       ok: false,
-      error: \`Gemini APIの利用上限（429）です。自動で別モデルへの切替を試しましたが、解析を完了できませんでした。\${summary}\`,
+      error: `Gemini APIの利用上限（429）です。自動で別モデルへの切替を試しましたが、解析を完了できませんでした。${summary}`,
       diagnostic: {
         category: categoryText,
         summary,
@@ -361,15 +360,6 @@ export async function onRequestPost(context) {
     lastError,
     modelsAttempted: attemptedModels
   }, 502);
-}
-  return jsonResponse(
-    {
-      ok: false,
-      error: "利用可能なGeminiモデルで解析を完了できませんでした。",
-      lastError,
-    },
-    502
-  );
 }
 
 export async function onRequestGet() {

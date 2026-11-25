@@ -1180,7 +1180,18 @@
         const payload = await res.json().catch(() => ({}));
         if (!res.ok || !payload?.ok) {
           const errMsg = payload?.error || `解析エラー（HTTP ${res.status}）`;
-          statusText.textContent = `解析失敗: ${errMsg}`;
+          const diagnostic = payload?.diagnostic;
+          const notesEl = document.getElementById('ocrNotesText');
+          const detailParts = [];
+          if (diagnostic?.category) detailParts.push(`原因分類: ${diagnostic.category}`);
+          if (diagnostic?.modelsAttempted?.length) detailParts.push(`試行モデル: ${diagnostic.modelsAttempted.join(' → ')}`);
+          if (diagnostic?.retryDelay) detailParts.push(`再試行目安: ${diagnostic.retryDelay}`);
+          if (diagnostic?.providerMessage) detailParts.push(`Google API: ${diagnostic.providerMessage}`);
+          statusText.textContent = `解析失敗（HTTP ${res.status}）: ${errMsg}`;
+          if (notesEl && detailParts.length) {
+            notesEl.textContent = detailParts.join(' ｜ ');
+            notesEl.classList.remove('hidden');
+          }
           showToast(errMsg);
           return;
         }

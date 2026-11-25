@@ -92,6 +92,15 @@
     </form>
   </dialog>
 
+  <dialog id="assetLinkDialog" class="dialog">
+    <form id="assetLinkForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">LINK MATERIAL</p><h2>資料を物件に紐付け</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
+      <input type="hidden" id="assetLinkId">
+      <label>紐付ける物件<select id="assetLinkProperty" required></select></label>
+      <p class="hint">選択した物件の詳細画面に、この原画像が関連資料として表示されます。画像そのものは変更しません。</p>
+      <div class="dialog-actions"><button type="button" class="button button-quiet" data-close>キャンセル</button><button type="submit" class="button button-dark">この物件に紐付ける</button></div>
+    </form>
+  </dialog>
   <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>
   <dialog id="compareDialog" class="dialog"><div id="compareContent"></div></dialog>
   <dialog id="checklistDialog" class="dialog"><div id="checklistContent"></div></dialog>

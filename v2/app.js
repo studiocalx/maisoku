@@ -113,7 +113,7 @@ function openVisitForm(record = null) {
 }
 function housingReferenceHtml(p) {
   if (!p.region || !HOUSING_REFERENCE[p.region]) return '<h3>地域別の住居費参考目安</h3><p class="hint">対象地域を設定すると、調査済み6市の参考値を表示します。地域が対象外の場合は金額を推測しません。</p>';
-  const ref = HOUSING_REFERENCE[p.region], rent = Number(p.rent || 0), delta = rent - ref.amount;
+  const ref = HOUSING_REFERENCE[p.region], rent = Number(p.rent || 0);
   let amount = ref.amount, areaNote = "";
   if (p.region === "大阪市" && Number(p.area) > 0 && Number(p.area) <= 15) {
     if (p.area > 10) amount = 36000;
@@ -234,7 +234,6 @@ async function saveAssetLink(event) {
 }
 async function exportBackup() {
   const data = await exportAllData();
-  const serialized = JSON.stringify(data, (key,value) => value instanceof Blob ? { __blob: true, type: value.type, data: null } : value);
   const enriched = { ...data, assets: await Promise.all(data.assets.map(async a => ({ ...a, blobData: await blobToDataUrl(a.blob), blob: undefined }))) };
   const blob = new Blob([JSON.stringify(enriched)], {type:"application/json"});
   const url = URL.createObjectURL(blob), a = document.createElement("a");
@@ -251,13 +250,42 @@ function dataUrlToBlob(dataUrl) {
   for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
   return new Blob([bytes],{type:mime});
 }
+function validateBackupRecords(records, label) {
+  const ids = new Set();
+  for (const record of records) {
+    if (!record || typeof record !== "object" || typeof record.id !== "string" || !record.id.trim()) {
+      throw new Error(label + "にIDのないデータがあります。復元を中止しました。");
+    }
+    if (ids.has(record.id)) throw new Error(label + "に重複したIDがあります。復元を中止しました。");
+    ids.add(record.id);
+  }
+}
 async function importBackup(file) {
   const parsed = JSON.parse(await file.text());
-  if (parsed.app !== "maisoku-ai-2" || !Array.isArray(parsed.properties) || !Array.isArray(parsed.visits) || !Array.isArray(parsed.assets)) throw new Error("マイソクAI 2.0のバックアップ形式ではありません。");
+  if (parsed.app !== "maisoku-ai-2" || parsed.version !== 1 ||
+      !Array.isArray(parsed.properties) || !Array.isArray(parsed.visits) || !Array.isArray(parsed.assets)) {
+    throw new Error("マイソクAI 2.0のバックアップ形式ではありません。");
+  }
+  validateBackupRecords(parsed.properties, "物件データ");
+  validateBackupRecords(parsed.visits, "街の記録");
+  validateBackupRecords(parsed.assets, "資料データ");
+  for (const asset of parsed.assets) {
+    if (typeof asset.blobData !== "string" ||
+        !/^data:[^;,]+;base64,[A-Za-z0-9+/]*={0,2}$/.test(asset.blobData)) {
+      throw new Error("画像データが不足しているか、形式が壊れています。現在のデータは変更していません。");
+    }
+  }
   const confirmed = confirm("現在の記録をバックアップ内容で置き換えます。事前に現在のデータも書き出しましたか？");
   if (!confirmed) return;
-  parsed.assets = parsed.assets.map(a => { const copy={...a}; if(copy.blobData){copy.blob=dataUrlToBlob(copy.blobData);delete copy.blobData;} return copy; });
-  await replaceAllData(parsed); await refresh(); $("backupStatus").textContent="バックアップを読み込みました。"; toast("データを復元しました。");
+  const restoredAssets = parsed.assets.map(asset => {
+    const copy = { ...asset, blob: dataUrlToBlob(asset.blobData) };
+    delete copy.blobData;
+    return copy;
+  });
+  await replaceAllData({ ...parsed, assets: restoredAssets });
+  await refresh();
+  $("backupStatus").textContent = "バックアップを読み込みました。";
+  toast("データを復元しました。");
 }
 
 document.addEventListener("change", (event) => {

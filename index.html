@@ -753,7 +753,7 @@
           folderName,
           title: propTitle || folderName,
           fileName: fileName || 'maisoku.jpg',
-          mimeType: 'image/jpeg',
+          mimeType: (dataUrl.match(/^data:([^;]+)/) || [null, 'image/jpeg'])[1],
           dataUrl,
           savedAt: now.toLocaleString('ja-JP')
         };
@@ -764,10 +764,10 @@
           tx.onerror = () => reject(tx.error);
         });
         await renderFolderAlbum();
-        if (notify) showToast(`撮影画像を端末内フォルダ「${folderName}」へ自動保存しました。`);
+        if (notify) showToast(`撮影画像をブラウザ内フォルダ「${folderName}」へ自動保存しました。`);
         return true;
       } catch {
-        if (notify) showToast('端末内フォルダへの保存に失敗しました。ブラウザの保存容量・設定を確認してください。');
+        if (notify) showToast('ブラウザ内フォルダへの保存に失敗しました。ブラウザの保存容量・設定を確認してください。');
         return false;
       }
     }
@@ -778,6 +778,36 @@
         return;
       }
       await saveImageRecordToFolder(state.currentImageDataUrl, state.currentImageName, true);
+    }
+
+    async function renameLatestSavedPhotoFolder(folderName) {
+      const safeName = (folderName || '').trim();
+      if (!safeName) return;
+      try {
+        const db = await openPhotoDb();
+        if (!db) return;
+        const items = await new Promise((resolve, reject) => {
+          const tx = db.transaction('folders', 'readonly');
+          const req = tx.objectStore('folders').getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => reject(req.error);
+        });
+        const latest = items.slice().sort((a, b) => Number(b.id) - Number(a.id))[0];
+        if (!latest) return;
+        latest.folderName = safeName;
+        latest.title = safeName;
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction('folders', 'readwrite');
+          tx.objectStore('folders').put(latest);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+        });
+        const folderInput = document.getElementById('folderNameInput');
+        if (folderInput && !folderInput.value.trim()) folderInput.value = safeName;
+        await renderFolderAlbum();
+      } catch {
+        // 画像自体の保存を優先し、フォルダ名の更新失敗は解析結果に影響させない
+      }
     }
 
     async function deleteFolderPhoto(id) {
@@ -1208,6 +1238,7 @@
         }
 
         applyOcrDataToForm(payload.data);
+        if (payload.data?.title) await renameLatestSavedPhotoFolder(payload.data.title);
         runFullEvaluation();
         statusText.textContent = `読取完了（モデル: ${payload.model || 'Gemini'}）— 未読取欄や数値を原本と照合してください`;
         showToast('マイソクのAI解析が完了しました。未読取項目・数値をご確認ください。');

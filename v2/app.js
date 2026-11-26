@@ -274,7 +274,7 @@ async function analyzeFlyer(file) {
       keyMoney: data.key_money || "",
       builtYear: numberOrNull(data.built_year),
       structure: data.structure || "",
-      memo: [data.notes, data.confidence_note ? "AI読み取り補足: " + data.confidence_note : ""].filter(Boolean).join("\\n")
+      memo: [data.notes, data.confidence_note ? "AI読み取り補足: " + data.confidence_note : ""].filter(Boolean).join("\n")
     };
     state.pendingAssetId = asset.id;
     $("assetDialog").close();

@@ -98,7 +98,8 @@ function openPropertyForm(record = null) {
   $("pUnitFloor").value = record?.unitFloor ?? "";
   $("pElevatorAccess").value = record?.elevatorAccess || "";
   $("pInfrastructure").value = record?.infrastructure || "";
-  $("pManagementStatus").value = record?.managementStatus || "";\n  $("pMaintenanceCostStatus").value = record?.maintenanceCostStatus || "";
+  $("pManagementStatus").value = record?.managementStatus || "";
+  $("pMaintenanceCostStatus").value = record?.maintenanceCostStatus || "";
   $("pNoiseStatus").value = record?.noiseStatus || "";
   $("pLaundryPlacement").value = record?.laundryPlacement || "";
   $("pLivingEnvironment").value = record?.livingEnvironment || "";
@@ -106,7 +107,10 @@ function openPropertyForm(record = null) {
   $("pMarketLiquidity").value = record?.marketLiquidity || "";
   $("pRepairCost").value = record?.repairCost ?? "";
   $("pAssetRetention").value = record?.assetRetention || "";
-  $("pRepairPlan").value = record?.repairPlan || "";\n  $("pManagementCompany").value = record?.managementCompany || "";\n  $("pElevatorText").value = record?.elevatorText || "";\n  $("pMajorRepairHistory").value = record?.majorRepairHistory || "";
+  $("pRepairPlan").value = record?.repairPlan || "";
+  $("pManagementCompany").value = record?.managementCompany || "";
+  $("pElevatorText").value = record?.elevatorText || "";
+  $("pMajorRepairHistory").value = record?.majorRepairHistory || "";
   $("pPipeUpdateHistory").value = record?.pipeUpdateHistory || "";
   $("pRegion").value = record?.region || "";
   $("pParking").value = record?.parkingFee ?? "";
@@ -234,7 +238,7 @@ async function showVisit(id) {
   $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">TOWN JOURNAL · ${escapeHtml(v.date || "")}</p><h2>${escapeHtml(v.place || "地域名未設定")}</h2></div><button class="icon-button" data-close>×</button></div><p class="detail-memo">${escapeHtml(v.memo || "メモはありません。")}</p><h3>関連する物件（${linked.length}件）</h3>${linked.map(p=>`<p>・${escapeHtml(p.title || "名称未設定")}</p>`).join("") || '<p class="hint">まだ物件は紐付いていません。</p>'}<div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-visit="${v.id}">編集する</button></div>`;
   $("detailDialog").showModal();
 }
-async async function saveForm(event) {
+async function saveForm(event) {
   event.preventDefault();
   const type = $("recordType").value, id = $("recordId").value || uid(), now = new Date().toISOString();
   if (type === "property") {
@@ -243,7 +247,7 @@ async async function saveForm(event) {
       ...previous, id, title: $("pTitle").value.trim(), address: $("pAddress").value.trim(),
       station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value),
       structureText: $("pStructureText").value.trim(), structureGrade: $("pStructureGrade").value || null,
-      structure: $("pStructureText").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value),
+      structure: $("pStructureGrade").value || null, area: $("pArea").value === "" ? null : Number($("pArea").value),
       priceYen: $("pPrice").value === "" ? null : Number($("pPrice").value),
       minimumBidYen: $("pMinimumBid").value === "" ? null : Number($("pMinimumBid").value),
       condoManagementFeeYen: $("pCondoManagementFee").value === "" ? null : Number($("pCondoManagementFee").value),
@@ -253,13 +257,16 @@ async async function saveForm(event) {
       totalFloors: $("pTotalFloors").value === "" ? null : Number($("pTotalFloors").value),
       unitFloor: $("pUnitFloor").value === "" ? null : Number($("pUnitFloor").value),
       occupancy: $("pOccupancy").value.trim(), elevatorAccess: $("pElevatorAccess").value || null,
-      infrastructure: $("pInfrastructure").value || null, managementStatus: $("pManagementStatus").value || null,\n      maintenanceCostStatus: $("pMaintenanceCostStatus").value || null,
+      infrastructure: $("pInfrastructure").value || null, managementStatus: $("pManagementStatus").value || null,
+      maintenanceCostStatus: $("pMaintenanceCostStatus").value || null,
       noiseStatus: $("pNoiseStatus").value || null, laundryPlacement: $("pLaundryPlacement").value || null,
       livingEnvironment: $("pLivingEnvironment").value || null, pipeRenewal: $("pPipeRenewal").value || null,
       marketLiquidity: $("pMarketLiquidity").value || null,
       repairCost: $("pRepairCost").value === "" ? null : Number($("pRepairCost").value),
       assetRetention: $("pAssetRetention").value || null,
-      repairPlan: $("pRepairPlan").value.trim(), pipeUpdateHistory: $("pPipeUpdateHistory").value.trim(),\n      managementCompany: $("pManagementCompany").value.trim(), elevatorText: $("pElevatorText").value.trim(),\n      majorRepairHistory: $("pMajorRepairHistory").value.trim(),
+      repairPlan: $("pRepairPlan").value.trim(), pipeUpdateHistory: $("pPipeUpdateHistory").value.trim(),
+      managementCompany: $("pManagementCompany").value.trim(), elevatorText: $("pElevatorText").value.trim(),
+      majorRepairHistory: $("pMajorRepairHistory").value.trim(),
       memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now
     };
     await saveRecord("properties", record);
@@ -272,7 +279,8 @@ async async function saveForm(event) {
     const previous = await getRecord("visits", id);
     await saveRecord("visits", { ...previous, id, date: $("vDate").value, place: $("vPlace").value.trim(), memo: $("vMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now });
   }
-  $("recordDialog").close(); await refresh(); toast("査定情報を保存しました。");\n  if (type === "property") await showProperty(id);
+  $("recordDialog").close(); await refresh(); toast("査定情報を保存しました。");
+  if (type === "property") await showProperty(id);
 }
 async function analyzeFlyer(file) {
   if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) {
@@ -493,7 +501,8 @@ document.addEventListener("click", async (event) => {
   if (target.hasAttribute("data-close")) { target.closest("dialog")?.close(); }
   if (target.id === "visitBtn") openVisitForm();
   if (target.id === "propertyBtn") openPropertyForm();
-  if (target.id === "captureBtn") { state.assessmentTargetPropertyId = null; $("assetDialog").showModal(); }\n  if (target.dataset.addMaterial) { state.assessmentTargetPropertyId = target.dataset.addMaterial; $("assetFile").value = ""; $("assetSaveStatus").textContent = "この物件の追加資料を撮影してください。"; $("assetDialog").showModal(); }
+  if (target.id === "captureBtn") { state.assessmentTargetPropertyId = null; $("assetDialog").showModal(); }
+  if (target.dataset.addMaterial) { state.assessmentTargetPropertyId = target.dataset.addMaterial; $("assetFile").value = ""; $("assetSaveStatus").textContent = "この物件の追加資料を撮影してください。"; $("assetDialog").showModal(); }
   if (target.id === "analyzeFlyerBtn") {
     const file = $("assetFile").files?.[0];
     if (!file) toast("先にマイソクを撮影するか、画像を選択してください。");

@@ -3,16 +3,16 @@
 export const GEM_CRITERIA = [
   { key:"structure", label:"構造（RC/SRC）", weight:10, score:v => v==="SRC造"?10:v==="RC造"?9:v==="その他"?4:null, reason:v=>v==="SRC造"?"SRC造として記載":v==="RC造"?"RC造として記載":"構造を確認" },
   { key:"elevatorAccess", label:"昇降機・フロア段差", weight:5, score:v=>({ "EV完結・段差なし":5,"EVあり・一部段差":3,"EVなし":1,"問題あり":0 }[v]??null) },
-  { key:"walkMinutes", label:"駅徒歩10分以内", weight:10, score:v=>Number.isFinite(Number(v))?(Number(v)<=5?10:Number(v)<=10?8:Number(v)<=15?5:2):null },
+  { key:"walkMinutes", label:"駅徒歩10分以内", weight:10, score:v=>has(v)&&Number.isFinite(Number(v))?(Number(v)<=5?10:Number(v)<=10?8:Number(v)<=15?5:2):null },
   { key:"infrastructure", label:"周辺インフラ（食料・医療）", weight:10, score:v=>({ "充実":10,"概ね充実":8,"どちらか不足":5,"不足":1 }[v]??null) },
   { key:"managementStatus", label:"管理体制・共用部", weight:15, score:v=>({ "良好":15,"概ね良好":12,"要確認":7,"問題あり":0 }[v]??null) },
   { key:"noiseStatus", label:"遮音・外部騒音", weight:8, score:v=>({ "良好":8,"許容範囲":6,"要確認":3,"問題あり":0 }[v]??null) },
   { key:"laundryPlacement", label:"洗濯機置場", weight:4, score:v=>({ "室内":4,"バルコニー":3,"なし・要工事":0 }[v]??null) },
   { key:"livingEnvironment", label:"採光・通風", weight:8, score:v=>({ "良好":8,"概ね良好":6,"要確認":3,"問題あり":0 }[v]??null) },
   { key:"pipeRenewal", label:"専有部配管の更新・更新可否", weight:10, score:v=>({ "更新済み":10,"更新可能":8,"一部確認":5,"未確認":null,"更新困難":0 }[v]??null) },
-  { key:"marketLiquidity", label:"市場流動性（再販・賃貸）", weight:8, score:v=>({ "高い":8,"標準":6,"低い":2,"未確認":null }[v]??null) },
-  { key:"repairCost", label:"修繕・清算コスト（目標30万円）", weight:7, score:v=>Number.isFinite(Number(v))?(Number(v)<=300000?7:Number(v)<=500000?4:0):null },
-  { key:"assetRetention", label:"長期居住・将来規格への適合", weight:5, score:v=>({ "適合":5,"概ね適合":4,"要確認":2,"不適合":0 }[v]??null) }
+  { key:"marketLiquidity", label:"市場流動性（再販・賃貸）", weight:6, score:v=>({ "高い":8,"標準":6,"低い":2,"未確認":null }[v]??null) },
+  { key:"repairCost", label:"修繕・清算コスト（目標30万円）", weight:5, score:v=>Number.isFinite(Number(v))?(Number(v)<=300000?7:Number(v)<=500000?4:0):null },
+  { key:"maintenanceCostStatus", label:"管理費・修繕積立金の長期負担", weight:5, score:v=>({ "軽い":5,"標準":4,"重い":1,"要確認":null }[v]??null) },\n  { key:"assetRetention", label:"長期居住・将来規格への適合", weight:4, score:v=>({ "適合":5,"概ね適合":4,"要確認":2,"不適合":0 }[v]??null) }
 ];
 
 const has = v => v !== null && v !== undefined && v !== "";

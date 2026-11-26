@@ -141,6 +141,8 @@ function compareProperties() {
     ["月額合計", p => [p.rent,p.fee,p.parkingFee].some(v=>v!=null) ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"],
     ["最寄駅", p => p.station || "未確認"], ["駅徒歩", p => p.walkMinutes ? p.walkMinutes+"分" : "未確認"],
     ["間取り", p => p.layout || "未確認"], ["専有面積", p => p.area ? p.area+"㎡" : "未確認"],
+    ["敷金", p => p.deposit || "未確認"], ["礼金", p => p.keyMoney || "未確認"],
+    ["築年", p => p.builtYear ? p.builtYear+"年" : "未確認"], ["構造・階数", p => p.structure || "未確認"],
     ["検討状態", p => p.status || "未整理"], ["メモ", p => p.memo || "—"]
   ];
   $("compareContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">SIDE BY SIDE</p><h2>物件比較</h2></div><button class="icon-button" data-close>×</button></div><div class="compare-table-wrap"><table class="compare-table"><thead><tr><th>比較項目</th>${items.map(p=>`<th>${escapeHtml(p.title || "名称未設定")}</th>`).join("")}</tr></thead><tbody>${rows.map(([label,fn])=>`<tr><th>${label}</th>${items.map(p=>`<td>${escapeHtml(fn(p))}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="hint">未確認項目は空欄や推測で補わず、そのまま比較表示しています。点数による自動順位付けは行いません。</p><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button></div>`;

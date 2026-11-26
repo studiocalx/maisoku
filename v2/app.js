@@ -1,4 +1,5 @@
 import { allRecords, saveRecord, deleteRecord, getRecord, replaceAllData, exportAllData, saveImageAsset } from "./db.js";
+import { assessCondominium } from "./assessment.js";
 
 const $ = (id) => document.getElementById(id);
 const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set(), pendingAssetId: null };
@@ -85,6 +86,28 @@ function openPropertyForm(record = null) {
   $("visitFields").classList.add("hidden");
   fillVisitOptions(record?.visitId || "");
   $("pTitle").value = record?.title || "";
+  $("pStructureText").value = record?.structureText || record?.structure || "";
+  $("pStructureGrade").value = record?.structureGrade || "";
+  $("pPrice").value = record?.priceYen ?? "";
+  $("pMinimumBid").value = record?.minimumBidYen ?? "";
+  $("pCondoManagementFee").value = record?.condoManagementFeeYen ?? "";
+  $("pRepairReserve").value = record?.repairReserveYen ?? "";
+  $("pArrears").value = record?.arrearsYen ?? "";
+  $("pOccupancy").value = record?.occupancy || "";
+  $("pTotalFloors").value = record?.totalFloors ?? "";
+  $("pUnitFloor").value = record?.unitFloor ?? "";
+  $("pElevatorAccess").value = record?.elevatorAccess || "";
+  $("pInfrastructure").value = record?.infrastructure || "";
+  $("pManagementStatus").value = record?.managementStatus || "";
+  $("pNoiseStatus").value = record?.noiseStatus || "";
+  $("pLaundryPlacement").value = record?.laundryPlacement || "";
+  $("pLivingEnvironment").value = record?.livingEnvironment || "";
+  $("pPipeRenewal").value = record?.pipeRenewal || "";
+  $("pMarketLiquidity").value = record?.marketLiquidity || "";
+  $("pRepairCost").value = record?.repairCost ?? "";
+  $("pAssetRetention").value = record?.assetRetention || "";
+  $("pRepairPlan").value = record?.repairPlan || "";
+  $("pPipeUpdateHistory").value = record?.pipeUpdateHistory || "";
   $("pRegion").value = record?.region || "";
   $("pParking").value = record?.parkingFee ?? "";
   $("pAddress").value = record?.address || "";
@@ -169,12 +192,35 @@ async function saveChecklist(propertyId, kind) {
   p.updatedAt = new Date().toISOString();
   await saveRecord("properties",p); await refresh(); $("checklistDialog").close(); toast("チェック結果を保存しました。");
 }
-async function showProperty(id) {
+async async function showProperty(id) {
   clearObjectUrls(detailObjectUrls);
   const p = await getRecord("properties", id);
   if (!p) return;
   const assets = state.assets.filter(a => a.propertyId === id);
-  $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY NOTE</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div><dl class="detail-grid"><dt>所在地</dt><dd>${escapeHtml(p.address || "未確認")}</dd><dt>地域</dt><dd>${escapeHtml(p.region || "未設定")}</dd><dt>賃料</dt><dd>${p.rent ? yen(p.rent) : "未確認"}</dd><dt>管理費等</dt><dd>${p.fee ? yen(p.fee) : "未確認"}</dd><dt>駐輪・駐車場</dt><dd>${p.parkingFee ? yen(p.parkingFee) : "未確認／不要"}</dd><dt>月額合計</dt><dd>${p.rent || p.fee || p.parkingFee ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"}</dd><dt>最寄駅</dt><dd>${escapeHtml(p.station || "未確認")}</dd><dt>徒歩</dt><dd>${p.walkMinutes ? escapeHtml(p.walkMinutes) + "分" : "未確認"}</dd><dt>間取り</dt><dd>${escapeHtml(p.layout || "未確認")}</dd><dt>面積</dt><dd>${p.area ? escapeHtml(p.area) + "㎡" : "未確認"}</dd><dt>敷金</dt><dd>${escapeHtml(p.deposit || "未確認")}</dd><dt>礼金</dt><dd>${escapeHtml(p.keyMoney || "未確認")}</dd><dt>築年</dt><dd>${p.builtYear ? escapeHtml(p.builtYear) + "年" : "未確認"}</dd><dt>構造・階数</dt><dd>${escapeHtml(p.structure || "未確認")}</dd><dt>状態</dt><dd>${escapeHtml(p.status || "未整理")}</dd></dl><section class="reference-panel">${housingReferenceHtml(p)}</section><div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">内見チェック</button><button class="mini-button" data-checklist="${p.id}" data-kind="contract">契約チェック</button></div><p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">編集する</button></div>`;
+  const appraisal = assessCondominium(p);
+  const scoreText = appraisal.score === null ? "—" : appraisal.score;
+  const verdictText = appraisal.verdict === "判定保留" ? "判定保留" : appraisal.verdict;
+  const itemRows = appraisal.items.map(item => `<tr><th>${escapeHtml(item.label)}</th><td>${escapeHtml(String(item.value))}</td><td>${item.points === null ? "未採点" : item.points + " / " + item.weight}</td><td>${escapeHtml(item.status)}</td></tr>`).join("");
+  const overview = [
+    ["所在地",p.address],["交通",p.station ? p.station + (p.walkMinutes != null ? " 徒歩"+p.walkMinutes+"分":"") : ""],
+    ["構造",p.structureText || p.structure],["専有面積",p.area != null ? p.area+"㎡":""],
+    ["販売価格",p.priceYen != null ? yen(p.priceYen):""],["最低買受価格",p.minimumBidYen != null ? yen(p.minimumBidYen):""],
+    ["管理費",p.condoManagementFeeYen != null ? yen(p.condoManagementFeeYen):""],["修繕積立金",p.repairReserveYen != null ? yen(p.repairReserveYen):""],
+    ["滞納額",p.arrearsYen != null ? yen(p.arrearsYen):""],["占有状況",p.occupancy]
+  ];
+  $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">GEM · CONDOMINIUM MONITOR</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div>
+  <section class="gem-score-panel"><div><p class="eyebrow">適合スコア · 仮配点による暫定評価</p><strong class="gem-score">${scoreText}<small> / 100</small></strong><p class="gem-verdict">総合判定：${verdictText}　／　個別戦略：${escapeHtml(appraisal.strategy)}</p></div><div class="gem-coverage">評価充足率 <b>${appraisal.coverage}%</b><p>未確認項目は減点せず、採点対象外として表示</p></div></section>
+  ${appraisal.provisional ? '<p class="hint">暫定評価です。評価充足率80%未満、または必須確認項目が未入力です。点数だけで購入判断をしないでください。</p>' : ""}
+  <h3>物件基本概要</h3><dl class="detail-grid">${overview.map(([k,v])=>`<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v || "未確認")}</dd>`).join("")}</dl>
+  <h3>物件査定要約（検討用）</h3><p class="detail-memo">${appraisal.score===null?"評価に必要な情報が不足しています。":appraisal.score>=80?"主要な評価項目に良好な情報があります。未確認事項を解消しながら検討を進めます。":appraisal.score>=60?"一定の適合項目があります。未確認事項と懸念点を確認して継続判断します。":"現時点では懸念点が残ります。条件・管理資料を確認してから判断します。"}</p>
+  <h3>注目ポイント</h3><p>${appraisal.strengths.length ? appraisal.strengths.slice(0,3).map(escapeHtml).join(" ／ ") : "資料から確認できた注目ポイントはまだありません。"}</p>
+  <h3>個別戦略資産監査</h3><div class="compare-table-wrap"><table class="compare-table"><thead><tr><th>評価指標</th><th>確認内容</th><th>得点</th><th>状況</th></tr></thead><tbody>${itemRows}</tbody></table></div>
+  <h3>詳細確認事項・未確認項目</h3><ul>${appraisal.missing.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>採点対象の必須項目は入力済みです。資料原本との照合は続けてください。</li>"}</ul>
+  <h3>リスク・注意事項</h3><ul>${appraisal.risks.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>入力済み項目から重大な警告は検出されていません。未確認項目がないことを意味しません。</li>"}</ul>
+  <p class="hint">配点はGEM Ver.2.1に数値指定がないため、現段階の実装用仮配点です。AIは資料の事実抽出を担当し、採点は固定ルールで計算します。最終判断には管理規約・重要事項調査報告書・長期修繕計画・現地確認が必要です。</p>
+  <div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">現地確認チェック</button></div>
+  <p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div>
+  <div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">査定情報を編集・再評価</button></div>`;
   for (const a of assets) {
     const img = document.querySelector(`[data-detail-image="${a.id}"]`);
     if (img && a.blob) { const url = URL.createObjectURL(a.blob); detailObjectUrls.push(url); img.src = url; }
@@ -188,12 +234,34 @@ async function showVisit(id) {
   $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">TOWN JOURNAL · ${escapeHtml(v.date || "")}</p><h2>${escapeHtml(v.place || "地域名未設定")}</h2></div><button class="icon-button" data-close>×</button></div><p class="detail-memo">${escapeHtml(v.memo || "メモはありません。")}</p><h3>関連する物件（${linked.length}件）</h3>${linked.map(p=>`<p>・${escapeHtml(p.title || "名称未設定")}</p>`).join("") || '<p class="hint">まだ物件は紐付いていません。</p>'}<div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-visit="${v.id}">編集する</button></div>`;
   $("detailDialog").showModal();
 }
-async function saveForm(event) {
+async async function saveForm(event) {
   event.preventDefault();
   const type = $("recordType").value, id = $("recordId").value || uid(), now = new Date().toISOString();
   if (type === "property") {
     const previous = await getRecord("properties", id);
-    const record = { ...previous, id, title: $("pTitle").value.trim(), region: $("pRegion").value, parkingFee: $("pParking").value === "" ? null : Number($("pParking").value), address: $("pAddress").value.trim(), rent: $("pRent").value === "" ? null : Number($("pRent").value), fee: $("pFee").value === "" ? null : Number($("pFee").value), station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value), layout: $("pLayout").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value), deposit: $("pDeposit").value.trim(), keyMoney: $("pKeyMoney").value.trim(), builtYear: $("pBuiltYear").value === "" ? null : Number($("pBuiltYear").value), structure: $("pStructure").value.trim(), status: $("pStatus").value, visitId: $("pVisit").value || null, memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now };
+    const record = {
+      ...previous, id, title: $("pTitle").value.trim(), address: $("pAddress").value.trim(),
+      station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value),
+      structureText: $("pStructureText").value.trim(), structureGrade: $("pStructureGrade").value || null,
+      structure: $("pStructureText").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value),
+      priceYen: $("pPrice").value === "" ? null : Number($("pPrice").value),
+      minimumBidYen: $("pMinimumBid").value === "" ? null : Number($("pMinimumBid").value),
+      condoManagementFeeYen: $("pCondoManagementFee").value === "" ? null : Number($("pCondoManagementFee").value),
+      repairReserveYen: $("pRepairReserve").value === "" ? null : Number($("pRepairReserve").value),
+      arrearsYen: $("pArrears").value === "" ? null : Number($("pArrears").value),
+      builtYear: $("pBuiltYear").value === "" ? null : Number($("pBuiltYear").value),
+      totalFloors: $("pTotalFloors").value === "" ? null : Number($("pTotalFloors").value),
+      unitFloor: $("pUnitFloor").value === "" ? null : Number($("pUnitFloor").value),
+      occupancy: $("pOccupancy").value.trim(), elevatorAccess: $("pElevatorAccess").value || null,
+      infrastructure: $("pInfrastructure").value || null, managementStatus: $("pManagementStatus").value || null,
+      noiseStatus: $("pNoiseStatus").value || null, laundryPlacement: $("pLaundryPlacement").value || null,
+      livingEnvironment: $("pLivingEnvironment").value || null, pipeRenewal: $("pPipeRenewal").value || null,
+      marketLiquidity: $("pMarketLiquidity").value || null,
+      repairCost: $("pRepairCost").value === "" ? null : Number($("pRepairCost").value),
+      assetRetention: $("pAssetRetention").value || null,
+      repairPlan: $("pRepairPlan").value.trim(), pipeUpdateHistory: $("pPipeUpdateHistory").value.trim(),
+      memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now
+    };
     await saveRecord("properties", record);
     if (state.pendingAssetId) {
       const asset = await getRecord("assets", state.pendingAssetId);

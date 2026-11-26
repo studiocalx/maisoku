@@ -285,8 +285,10 @@ async function analyzeFlyer(file) {
     status.textContent = "AI読み取り完了。原本と照合してから保存してください。";
     toast("読み取り結果を入力欄に反映しました。確認して保存してください。");
   } catch (error) {
-    status.textContent = "AI読み取りは完了しませんでした。原画像は保存済みです。未整理資料から後で確認できます。";
-    await refresh();
+    status.textContent = asset
+      ? "AI読み取りは完了しませんでした。原画像は保存済みです。未整理資料から後で確認できます。"
+      : "原画像を保存できませんでした。保存領域の空き容量やブラウザ設定を確認してください。";
+    if (asset) await refresh();
     toast(error.message || "AI読み取りに失敗しました。");
   } finally {
     button.disabled = false;

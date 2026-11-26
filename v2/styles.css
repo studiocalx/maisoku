@@ -21,3 +21,12 @@
 .checklist-row select,.checklist-row textarea{grid-column:2;min-width:0;width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;font:inherit;font-size:11px}
 .checklist-row textarea{grid-column:1/-1;resize:vertical}
 @media(max-width:640px){.compare-bar{gap:6px;padding:9px}.compare-bar span{font-size:10px}.compare-bar .button{font-size:10px;padding:9px}.checklist-row{grid-template-columns:minmax(0,1fr) 100px}.reference-row strong{font-size:14px}}
+
+.gem-score-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,.42fr);gap:16px;align-items:center;padding:18px;border:1px solid #c9ceb4;border-radius:16px;background:#eef0e4;margin:14px 0 20px}
+.gem-score{display:block;font-size:48px;line-height:1;font-weight:850;letter-spacing:-.06em;color:#39432c}
+.gem-score small{font-size:15px;letter-spacing:0;color:var(--muted)}
+.gem-verdict{font-size:13px;font-weight:800;margin:10px 0 0}
+.gem-coverage{padding-left:14px;border-left:1px solid #c9ceb4;font-size:11px;color:var(--muted)}
+.gem-coverage b{display:block;font-size:24px;color:var(--ink);margin-top:4px}
+.gem-coverage p{line-height:1.5;margin:5px 0 0}
+@media(max-width:520px){.gem-score-panel{grid-template-columns:1fr}.gem-coverage{padding:10px 0 0;border-left:0;border-top:1px solid #c9ceb4}}

@@ -1,7 +1,7 @@
 import { allRecords, saveRecord, deleteRecord, getRecord, replaceAllData, exportAllData, saveImageAsset } from "./db.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set() };
+const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set(), pendingAssetId: null };
 const HOUSING_REFERENCE = {
   "大阪市": { amount: 40000, confidence: "公式直接確認", areaRule: true, source: "https://www.city.osaka.lg.jp/fukushi/page/0000086902.html" },
   "枚方市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.hirakata.osaka.jp/0000029011.html" },
@@ -79,7 +79,7 @@ function openPropertyForm(record = null) {
   $("recordForm").reset();
   $("recordType").value = "property";
   $("recordId").value = record?.id || "";
-  $("formTitle").textContent = record ? "物件を編集" : "物件を登録";
+  $("formTitle").textContent = record?.isOcrDraft ? "AI読み取り結果を確認" : record ? "物件を編集" : "物件を登録";
   $("formEyebrow").textContent = record ? "EDIT PROPERTY" : "NEW PROPERTY";
   $("propertyFields").classList.remove("hidden");
   $("visitFields").classList.add("hidden");
@@ -94,6 +94,10 @@ function openPropertyForm(record = null) {
   $("pWalk").value = record?.walkMinutes ?? "";
   $("pLayout").value = record?.layout || "";
   $("pArea").value = record?.area ?? "";
+  $("pDeposit").value = record?.deposit || "";
+  $("pKeyMoney").value = record?.keyMoney || "";
+  $("pBuiltYear").value = record?.builtYear ?? "";
+  $("pStructure").value = record?.structure || "";
   $("pStatus").value = record?.status || "未整理";
   $("pMemo").value = record?.memo || "";
   $("recordDialog").showModal();
@@ -168,7 +172,7 @@ async function showProperty(id) {
   const p = await getRecord("properties", id);
   if (!p) return;
   const assets = state.assets.filter(a => a.propertyId === id);
-  $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY NOTE</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div><dl class="detail-grid"><dt>所在地</dt><dd>${escapeHtml(p.address || "未確認")}</dd><dt>地域</dt><dd>${escapeHtml(p.region || "未設定")}</dd><dt>賃料</dt><dd>${p.rent ? yen(p.rent) : "未確認"}</dd><dt>管理費等</dt><dd>${p.fee ? yen(p.fee) : "未確認"}</dd><dt>駐輪・駐車場</dt><dd>${p.parkingFee ? yen(p.parkingFee) : "未確認／不要"}</dd><dt>月額合計</dt><dd>${p.rent || p.fee || p.parkingFee ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"}</dd><dt>最寄駅</dt><dd>${escapeHtml(p.station || "未確認")}</dd><dt>徒歩</dt><dd>${p.walkMinutes ? escapeHtml(p.walkMinutes) + "分" : "未確認"}</dd><dt>間取り</dt><dd>${escapeHtml(p.layout || "未確認")}</dd><dt>面積</dt><dd>${p.area ? escapeHtml(p.area) + "㎡" : "未確認"}</dd><dt>状態</dt><dd>${escapeHtml(p.status || "未整理")}</dd></dl><section class="reference-panel">${housingReferenceHtml(p)}</section><div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">内見チェック</button><button class="mini-button" data-checklist="${p.id}" data-kind="contract">契約チェック</button></div><p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">編集する</button></div>`;
+  $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY NOTE</p><h2>${escapeHtml(p.title || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div><dl class="detail-grid"><dt>所在地</dt><dd>${escapeHtml(p.address || "未確認")}</dd><dt>地域</dt><dd>${escapeHtml(p.region || "未設定")}</dd><dt>賃料</dt><dd>${p.rent ? yen(p.rent) : "未確認"}</dd><dt>管理費等</dt><dd>${p.fee ? yen(p.fee) : "未確認"}</dd><dt>駐輪・駐車場</dt><dd>${p.parkingFee ? yen(p.parkingFee) : "未確認／不要"}</dd><dt>月額合計</dt><dd>${p.rent || p.fee || p.parkingFee ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"}</dd><dt>最寄駅</dt><dd>${escapeHtml(p.station || "未確認")}</dd><dt>徒歩</dt><dd>${p.walkMinutes ? escapeHtml(p.walkMinutes) + "分" : "未確認"}</dd><dt>間取り</dt><dd>${escapeHtml(p.layout || "未確認")}</dd><dt>面積</dt><dd>${p.area ? escapeHtml(p.area) + "㎡" : "未確認"}</dd><dt>敷金</dt><dd>${escapeHtml(p.deposit || "未確認")}</dd><dt>礼金</dt><dd>${escapeHtml(p.keyMoney || "未確認")}</dd><dt>築年</dt><dd>${p.builtYear ? escapeHtml(p.builtYear) + "年" : "未確認"}</dd><dt>構造・階数</dt><dd>${escapeHtml(p.structure || "未確認")}</dd><dt>状態</dt><dd>${escapeHtml(p.status || "未整理")}</dd></dl><section class="reference-panel">${housingReferenceHtml(p)}</section><div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">内見チェック</button><button class="mini-button" data-checklist="${p.id}" data-kind="contract">契約チェック</button></div><p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">編集する</button></div>`;
   for (const a of assets) {
     const img = document.querySelector(`[data-detail-image="${a.id}"]`);
     if (img && a.blob) { const url = URL.createObjectURL(a.blob); detailObjectUrls.push(url); img.src = url; }
@@ -187,14 +191,106 @@ async function saveForm(event) {
   const type = $("recordType").value, id = $("recordId").value || uid(), now = new Date().toISOString();
   if (type === "property") {
     const previous = await getRecord("properties", id);
-    const record = { ...previous, id, title: $("pTitle").value.trim(), region: $("pRegion").value, parkingFee: $("pParking").value === "" ? null : Number($("pParking").value), address: $("pAddress").value.trim(), rent: $("pRent").value === "" ? null : Number($("pRent").value), fee: $("pFee").value === "" ? null : Number($("pFee").value), station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value), layout: $("pLayout").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value), status: $("pStatus").value, visitId: $("pVisit").value || null, memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now };
+    const record = { ...previous, id, title: $("pTitle").value.trim(), region: $("pRegion").value, parkingFee: $("pParking").value === "" ? null : Number($("pParking").value), address: $("pAddress").value.trim(), rent: $("pRent").value === "" ? null : Number($("pRent").value), fee: $("pFee").value === "" ? null : Number($("pFee").value), station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value), layout: $("pLayout").value.trim(), area: $("pArea").value === "" ? null : Number($("pArea").value), deposit: $("pDeposit").value.trim(), keyMoney: $("pKeyMoney").value.trim(), builtYear: $("pBuiltYear").value === "" ? null : Number($("pBuiltYear").value), structure: $("pStructure").value.trim(), status: $("pStatus").value, visitId: $("pVisit").value || null, memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now };
     await saveRecord("properties", record);
+    if (state.pendingAssetId) {
+      const asset = await getRecord("assets", state.pendingAssetId);
+      if (asset) { asset.propertyId = id; await saveRecord("assets", asset); }
+      state.pendingAssetId = null;
+    }
   } else {
     const previous = await getRecord("visits", id);
     await saveRecord("visits", { ...previous, id, date: $("vDate").value, place: $("vPlace").value.trim(), memo: $("vMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now });
   }
   $("recordDialog").close(); await refresh(); toast("記録を保存しました。");
 }
+async function analyzeFlyer(file) {
+  if (!file || !/^image\\/(jpeg|png|webp)$/i.test(file.type || "")) {
+    toast("JPEG・PNG・WebPのマイソク画像を選択してください。");
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    toast("画像が20MBを超えています。サイズを下げてください。");
+    return;
+  }
+  const button = $("analyzeFlyerBtn");
+  const status = $("assetSaveStatus");
+  button.disabled = true;
+  button.textContent = "原画像を保存しています…";
+  let asset;
+  try {
+    // 原本を先に保存。AI通信に失敗しても撮影資料は失われない。
+    asset = await saveImageAsset(file, { kind: "マイソク", memo: $("assetMemo").value.trim() });
+    status.textContent = "原画像を保存しました。AIで項目を読み取っています…";
+    const bitmap = await createImageBitmap(file);
+    let compressed;
+    try {
+      const scale = Math.min(1, 2500 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) throw new Error("画像処理を開始できませんでした。");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      compressed = await new Promise((resolve, reject) =>
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("画像の圧縮に失敗しました。")), "image/jpeg", 0.86)
+      );
+    } finally {
+      bitmap.close();
+    }
+    if (compressed.size > 12 * 1024 * 1024) throw new Error("圧縮後も12MBを超えています。画像を小さくしてください。");
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = () => reject(new Error("画像を読み込めませんでした。"));
+      reader.readAsDataURL(compressed);
+    });
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg" })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true || !result.data) {
+      throw new Error(result.error || "AI読み取りに失敗しました。");
+    }
+    const data = result.data;
+    const numberOrNull = value => Number.isFinite(Number(value)) && value !== null && value !== "" ? Number(value) : null;
+    const draft = {
+      isOcrDraft: true,
+      title: data.title || "",
+      address: data.address || "",
+      rent: numberOrNull(data.rent_yen),
+      fee: numberOrNull(data.management_fee_yen),
+      station: data.station || "",
+      walkMinutes: numberOrNull(data.walk_minutes),
+      layout: data.layout || "",
+      area: numberOrNull(data.area_sqm),
+      deposit: data.deposit || "",
+      keyMoney: data.key_money || "",
+      builtYear: numberOrNull(data.built_year),
+      structure: data.structure || "",
+      memo: [data.notes, data.confidence_note ? "AI読み取り補足: " + data.confidence_note : ""].filter(Boolean).join("\\n")
+    };
+    state.pendingAssetId = asset.id;
+    $("assetDialog").close();
+    setTab("properties");
+    openPropertyForm(draft);
+    $("assetFile").value = "";
+    $("assetMemo").value = "";
+    status.textContent = "AI読み取り完了。原本と照合してから保存してください。";
+    toast("読み取り結果を入力欄に反映しました。確認して保存してください。");
+  } catch (error) {
+    status.textContent = "AI読み取りは完了しませんでした。原画像は保存済みです。未整理資料から後で確認できます。";
+    toast(error.message || "AI読み取りに失敗しました。");
+  } finally {
+    button.disabled = false;
+    button.textContent = "マイソクをAIで読み取り、物件登録へ";
+  }
+}
+
 async function saveSelectedImages(files) {
   if (!files.length) return;
   $("assetSaveStatus").textContent = "原画像を保存しています…";
@@ -304,6 +400,11 @@ document.addEventListener("click", async (event) => {
   if (target.id === "visitBtn") openVisitForm();
   if (target.id === "propertyBtn") openPropertyForm();
   if (target.id === "captureBtn") $("assetDialog").showModal();
+  if (target.id === "analyzeFlyerBtn") {
+    const file = $("assetFile").files?.[0];
+    if (!file) toast("先にマイソクを撮影するか、画像を選択してください。");
+    else await analyzeFlyer(file);
+  }
   if (target.id === "backupBtn") $("backupDialog").showModal();
   if (target.id === "compareBtn") compareProperties();
   if (target.id === "clearCompareBtn") { state.compareIds.clear(); render(); }
@@ -323,7 +424,7 @@ $("detailDialog").addEventListener("close", () => clearObjectUrls(detailObjectUr
 $("recordForm").addEventListener("submit", saveForm);
 $("assetLinkForm").addEventListener("submit", async e => { try { await saveAssetLink(e); } catch (err) { toast("紐付けに失敗しました: " + err.message); } });
 $("assetForm").addEventListener("submit", async e => { e.preventDefault(); try { await saveSelectedImages([...$("assetFile").files]); } catch(err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; } });
-$("assetFile").addEventListener("change", () => { $("assetSaveStatus").textContent = $("assetFile").files.length ? `${$("assetFile").files.length}件を選択中。保存ボタンで原画像を保存します。` : ""; });
+$("assetFile").addEventListener("change", () => { $("assetSaveStatus").textContent = $("assetFile").files.length ? `${$("assetFile").files.length}件を選択中。AI読み取りは先頭の1枚を使います。` : ""; });
 $("quickFile").addEventListener("change", async () => { try { await saveSelectedImages([...$("quickFile").files]); } catch(e) { toast("保存失敗: " + e.message); } });
 $("propertySearch").addEventListener("input", render);
 $("importFile").addEventListener("change", async e => { const file=e.target.files?.[0]; if(!file)return; try{await importBackup(file);}catch(err){$("backupStatus").textContent="読み込み失敗: "+err.message;} e.target.value=""; });

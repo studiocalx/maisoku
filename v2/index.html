@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#20231e">
-  <meta name="description" content="旅先で出会った街と住まいの候補を、ゆっくり記録・比較する個人用ツール。">
-  <title>マイソクAI 2.0</title>
+  <meta name="description" content="分譲マンションの資料を読み取り、GEM基準で審査・採点・比較する査定システム。">
+  <title>マイソクAI 2.0｜GEM分譲マンション査定</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="./"><span class="brand-mark">M</span><span>マイソクAI <small>2.0 / FIELD NOTES</small></span></a>
+    <a class="brand" href="./"><span class="brand-mark">M</span><span>マイソクAI <small>2.0 / GEM CONDOMINIUM MONITOR</small></span></a>
     <button id="backupBtn" class="button button-quiet">データ管理</button>
   </header>
   <main class="shell">
@@ -21,9 +21,9 @@
       <p class="intro-copy">街で見つけた物件も、歩いて感じたことも。まず記録して、あとから考える。</p>
     </section>
     <section class="quick-actions">
-      <button id="captureBtn" class="action-card action-primary"><span class="action-icon">＋</span><span><b>資料を撮影・保存</b><small>物件名が分からなくても大丈夫</small></span></button>
-      <button id="visitBtn" class="action-card"><span class="action-icon">↗</span><span><b>街の訪問記録</b><small>物件がなくても街だけ記録</small></span></button>
-      <button id="propertyBtn" class="action-card"><span class="action-icon">⌂</span><span><b>物件を登録</b><small>手入力で候補を追加</small></span></button>
+      <button id="captureBtn" class="action-card action-primary"><span class="action-icon">＋</span><span><b>分譲資料を撮影・査定</b><small>OCR・GEM審査・採点</small></span></button>
+      <button id="visitBtn" class="action-card"><span class="action-icon">↗</span><span><b>地域・現地調査</b><small>街の評価と現地メモ</small></span></button>
+      <button id="propertyBtn" class="action-card"><span class="action-icon">⌂</span><span><b>分譲物件を登録</b><small>手入力で査定対象を追加</small></span></button>
     </section>
     <section class="stats" aria-label="登録件数">
       <div><strong id="propertyCount">0</strong><span>物件</span></div>
@@ -36,7 +36,7 @@
       <button class="tab" data-tab="assets">未整理資料</button>
     </nav>
     <section id="propertiesPanel" class="panel">
-      <div class="section-heading"><div><p class="eyebrow">PROPERTY ARCHIVE</p><h2>物件の記録</h2></div><input id="propertySearch" class="search" type="search" placeholder="物件名・地域で検索"></div>
+      <div class="section-heading"><div><p class="eyebrow">PROPERTY ARCHIVE</p><h2>分譲マンション査定</h2></div><input id="propertySearch" class="search" type="search" placeholder="物件名・地域で検索"></div>
       <div id="propertiesList" class="record-list"></div>
       <div id="compareBar" class="compare-bar hidden"><span id="compareCount">0件選択中</span><button id="compareBtn" class="button button-dark">選択した物件を比較</button><button id="clearCompareBtn" class="mini-button">選択解除</button></div>
     </section>
@@ -57,23 +57,38 @@
       <div class="dialog-head"><div><p class="eyebrow" id="formEyebrow">NEW RECORD</p><h2 id="formTitle">物件を登録</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
       <input type="hidden" id="recordId"><input type="hidden" id="recordType">
       <div id="propertyFields" class="form-grid">
-        <label class="wide">物件名・仮称<input id="pTitle" maxlength="120" placeholder="例：駅前のマンション（仮）"></label>
-        <label class="wide">所在地・地域<input id="pAddress" maxlength="180" placeholder="市区町村・町名など"></label>
-        <label>地域（参考データ対象）<select id="pRegion"><option value="">未設定</option><option>大阪市</option><option>枚方市</option><option>門真市</option><option>八尾市</option><option>東大阪市</option><option>尼崎市</option></select></label>
-        <label>賃料（円）<input id="pRent" type="number" min="0" step="1000" inputmode="numeric"></label>
-        <label>管理費等（円）<input id="pFee" type="number" min="0" step="500" inputmode="numeric"></label>
-        <label>駐輪・駐車場代（円）<input id="pParking" type="number" min="0" step="100" inputmode="numeric"></label>
+        <label class="wide">物件名<input id="pTitle" maxlength="120" placeholder="マンション名・号室"></label>
+        <label class="wide">所在地<input id="pAddress" maxlength="180" placeholder="市区町村・町名"></label>
         <label>最寄駅<input id="pStation" maxlength="100"></label>
         <label>駅徒歩（分）<input id="pWalk" type="number" min="0" max="180"></label>
-        <label>間取り<input id="pLayout" maxlength="30" placeholder="1K / 2DK など"></label>
-        <label>専有面積（㎡）<input id="pArea" type="number" min="0" step="0.1"></label>
-        <label>敷金<input id="pDeposit" maxlength="80" placeholder="例：1ヶ月"></label>
-        <label>礼金<input id="pKeyMoney" maxlength="80" placeholder="例：なし"></label>
+        <label>構造表記<input id="pStructureText" maxlength="120" placeholder="例：鉄筋コンクリート造"></label>
+        <label>構造分類<select id="pStructureGrade"><option value="">未確認</option><option>RC造</option><option>SRC造</option><option>その他</option></select></label>
+        <label>専有面積（㎡）<input id="pArea" type="number" min="0" step="0.01"></label>
+        <label>販売価格（円）<input id="pPrice" type="number" min="0" step="10000"></label>
+        <label>最低買受価格（円）<input id="pMinimumBid" type="number" min="0" step="10000"></label>
+        <label>管理費（月額・円）<input id="pCondoManagementFee" type="number" min="0" step="100"></label>
+        <label>修繕積立金（月額・円）<input id="pRepairReserve" type="number" min="0" step="100"></label>
+        <label>滞納額（円）<input id="pArrears" type="number" min="0" step="100"></label>
         <label>築年（西暦）<input id="pBuiltYear" type="number" min="1900" max="2100"></label>
-        <label>構造・階数<input id="pStructure" maxlength="100" placeholder="例：RC造 8階建・3階"></label>
-        <label>検討状態<select id="pStatus"><option>未整理</option><option>検討中</option><option>保留</option><option>候補外</option></select></label>
-        <label>訪問記録<select id="pVisit"><option value="">紐付けなし</option></select></label>
-        <label class="wide">メモ<textarea id="pMemo" rows="3" placeholder="不動産店で聞いたこと、気になった点など"></textarea></label>
+        <label>総階数<input id="pTotalFloors" type="number" min="1" max="150"></label>
+        <label>所在階<input id="pUnitFloor" type="number" min="1" max="150"></label>
+        <label>占有状況<input id="pOccupancy" maxlength="100" placeholder="例：空室・所有者居住・賃貸中"></label>
+        <label>昇降機・段差<select id="pElevatorAccess"><option value="">未確認</option><option>EV完結・段差なし</option><option>EVあり・一部段差</option><option>EVなし</option><option>問題あり</option></select></label>
+        <label>周辺インフラ<select id="pInfrastructure"><option value="">未確認</option><option>充実</option><option>概ね充実</option><option>どちらか不足</option><option>不足</option></select></label>
+        <label>管理体制・共用部<select id="pManagementStatus"><option value="">未確認</option><option>良好</option><option>概ね良好</option><option>要確認</option><option>問題あり</option></select></label>
+        <label>遮音・外部騒音<select id="pNoiseStatus"><option value="">未確認</option><option>良好</option><option>許容範囲</option><option>要確認</option><option>問題あり</option></select></label>
+        <label>洗濯機置場<select id="pLaundryPlacement"><option value="">未確認</option><option>室内</option><option>バルコニー</option><option>なし・要工事</option></select></label>
+        <label>採光・通風<select id="pLivingEnvironment"><option value="">未確認</option><option>良好</option><option>概ね良好</option><option>要確認</option><option>問題あり</option></select></label>
+        <label>専有部配管<select id="pPipeRenewal"><option value="">未確認</option><option>更新済み</option><option>更新可能</option><option>一部確認</option><option>更新困難</option></select></label>
+        <label>市場流動性<select id="pMarketLiquidity"><option value="">未確認</option><option>高い</option><option>標準</option><option>低い</option></select></label>
+        <label>推定修繕・清算コスト（円）<input id="pRepairCost" type="number" min="0" step="10000" placeholder="目標30万円以内"></label>
+        <label>長期居住・将来規格適合<select id="pAssetRetention"><option value="">未確認</option><option>適合</option><option>概ね適合</option><option>要確認</option><option>不適合</option></select></label>
+        <label class="wide">長期修繕計画・大規模修繕履歴<textarea id="pRepairPlan" rows="2" placeholder="資料記載・管理会社への確認内容"></textarea></label>
+        <label class="wide">専有部配管の更新履歴<textarea id="pPipeUpdateHistory" rows="2" placeholder="資料記載・確認内容"></textarea></label>
+        <label class="wide">メモ・追加資料で判明した条件<textarea id="pMemo" rows="3" placeholder="不動産会社への質問、交渉中の条件変更など"></textarea></label>
+        <div class="hidden">
+          <input id="pRegion"><input id="pParking"><input id="pRent"><input id="pFee"><input id="pLayout"><input id="pDeposit"><input id="pKeyMoney"><input id="pStatus"><select id="pVisit"></select>
+        </div>
       </div>
       <div id="visitFields" class="form-grid hidden">
         <label>訪問日<input id="vDate" type="date"></label>
@@ -88,9 +103,9 @@
     <form id="assetForm" method="dialog">
       <div class="dialog-head"><div><p class="eyebrow">SAVE ORIGINAL FIRST</p><h2>資料を保存</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
       <p class="hint">画像を選ぶと、まず原画像をこのブラウザ内に保存します。物件名や詳細入力は後回しにできます。</p>
-      <label class="upload-zone">カメラで撮影／画像を選択<input id="assetFile" type="file" accept="image/*" capture="environment" multiple></label>
-      <p class="hint">マイソクを選んだ場合は、下のボタンからこのアプリ内でAI読み取りできます。原画像は先に保存し、読み取り結果を確認して物件情報に登録します。</p>
-      <button id="analyzeFlyerBtn" type="button" class="button button-dark full">マイソクをAIで読み取り、物件登録へ</button>
+      <label class="upload-zone">分譲マンション資料を撮影／画像を選択<input id="assetFile" type="file" accept="image/*" capture="environment" multiple></label>
+      <p class="hint">販売図面・物件概要書などを読み取り、GEM基準で査定します。原画像を先に保存し、読み取り結果と評価根拠を確認してください。</p>
+      <button id="analyzeFlyerBtn" type="button" class="button button-dark full">分譲資料をAIで読み取り、GEM査定</button>
       <label>資料の種類<select id="assetKind"><option>マイソク</option><option>間取り図</option><option>周辺地図</option><option>店頭掲示</option><option>その他</option></select></label>
       <label>ひとことメモ<textarea id="assetMemo" rows="2" placeholder="店名、聞いた話など（任意）"></textarea></label>
       <div id="assetSaveStatus" class="status-line" aria-live="polite"></div>
@@ -107,7 +122,7 @@
       <div class="dialog-actions"><button type="button" class="button button-quiet" data-close>キャンセル</button><button type="submit" class="button button-dark">この物件に紐付ける</button></div>
     </form>
   </dialog>
-  <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>
+  <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>\n  <script type="module" src="./assessment.js"></script>
   <dialog id="compareDialog" class="dialog"><div id="compareContent"></div></dialog>
   <dialog id="checklistDialog" class="dialog"><div id="checklistContent"></div></dialog>
   <dialog id="backupDialog" class="dialog">

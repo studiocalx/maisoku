@@ -212,7 +212,7 @@ function buildPropertyFieldGroups() {
         return `<label class="wide">${escapeHtml(def.label)}<textarea id="${id}" data-pf="${def.key}" rows="2"></textarea><span class="origin-note" data-origin-note="${def.key}"></span></label>`;
       }
       const inputType = (def.type === "number" || def.type === "yen") ? "number" : "text";
-      const step = def.type === "yen" ? "100" : def.type === "number" ? "any" : "";
+      const step = def.type === "yen" ? "1" : def.type === "number" ? "any" : "";
       return `<label>${escapeHtml(def.label)}<input id="${id}" data-pf="${def.key}" type="${inputType}"${step ? ` step="${step}"` : ""}><span class="origin-note" data-origin-note="${def.key}"></span></label>`;
     }).join("")}</div></div>`;
   }).join("");

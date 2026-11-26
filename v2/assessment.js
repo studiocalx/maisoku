@@ -37,7 +37,8 @@ export function assessCondominium(property={}) {
   const risks = [];
   if (Number(property.arrearsYen)>0) risks.push("管理費・修繕積立金等の滞納額が記載されています。金額と承継関係を確認してください。");
   if (Number(property.repairCost)>300000) risks.push("修繕・清算コストが目標30万円を超えています。");
-  if (property.managementStatus==="問題あり") risks.push("管理体制・共用部に問題ありの評価です。");\n  if (property.maintenanceCostStatus==="重い") risks.push("管理費・修繕積立金の長期負担が重いという評価です。");
+  if (property.managementStatus==="問題あり") risks.push("管理体制・共用部に問題ありの評価です。");
+  if (property.maintenanceCostStatus==="重い") risks.push("管理費・修繕積立金の長期負担が重いという評価です。");
   if (property.pipeRenewal==="更新困難") risks.push("専有部配管の更新が困難とされています。");
   const strengths = items.filter(x=>x.points!==null&&x.points>=x.weight*0.8).map(x=>x.label);
   return { score, coverage, verdict, strategy, items, missing, risks, strengths, coreMissing, provisional:coverage<80||coreMissing };

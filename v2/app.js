@@ -225,10 +225,10 @@ async function showProperty(id) {
   <h3>物件基本概要</h3><dl class="detail-grid">${overview.map(([k,v])=>`<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v || "未確認")}</dd>`).join("")}</dl>
   <h3>物件査定要約（検討用）</h3><p class="detail-memo">${appraisal.score===null?"評価に必要な情報が不足しています。":appraisal.score>=80?"主要な評価項目に良好な情報があります。未確認事項を解消しながら検討を進めます。":appraisal.score>=60?"一定の適合項目があります。未確認事項と懸念点を確認して継続判断します。":"現時点では懸念点が残ります。条件・管理資料を確認してから判断します。"}</p>
   <h3>注目ポイント</h3><p>${appraisal.strengths.length ? appraisal.strengths.slice(0,3).map(escapeHtml).join(" ／ ") : "資料から確認できた注目ポイントはまだありません。"}</p><h3>詳細確認事項（不動産会社への質問）</h3><p>${!p.repairPlan ? "長期修繕計画の進捗と、次回大規模修繕の実施時期・資金計画を確認してください。" : !p.pipeUpdateHistory ? "専有部配管の更新履歴と、今後の更新可否・費用負担区分を確認してください。" : "管理費・修繕積立金の改定予定と、長期修繕計画との整合性を確認してください。"}</p>
-  <h3>個別戦略資産監査</h3><div class="compare-table-wrap"><table class="compare-table"><thead><tr><th>評価指標</th><th>確認内容</th><th>得点</th><th>状況</th></tr></thead><tbody>${itemRows}</tbody></table></div>
-  <h3>詳細確認事項・未確認項目</h3><ul>${appraisal.missing.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>採点対象の必須項目は入力済みです。資料原本との照合は続けてください。</li>"}</ul>
+  <details class="gem-private"><summary>個別戦略資産監査（内部用メモ）</summary><div class="compare-table-wrap"><table class="compare-table"><thead><tr><th>評価指標</th><th>確認内容</th><th>得点</th><th>状況</th></tr></thead><tbody>${itemRows}</tbody></table></div>
+  <h3>未確認項目</h3><ul>${appraisal.missing.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>採点対象の必須項目は入力済みです。資料原本との照合は続けてください。</li>"}</ul>
   <h3>リスク・注意事項</h3><ul>${appraisal.risks.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>入力済み項目から重大な警告は検出されていません。未確認項目がないことを意味しません。</li>"}</ul>
-  <p class="hint">配点はGEM Ver.2.1に数値指定がないため、現段階の実装用仮配点です。AIは資料の事実抽出を担当し、採点は固定ルールで計算します。これは購入適合性の検討補助であり、不動産鑑定評価や売買価格の査定ではありません。最終判断には管理規約・重要事項調査報告書・長期修繕計画・現地確認が必要です。</p>
+  <p class="hint">配点はGEM Ver.2.1に数値指定がないため、現段階の実装用仮配点です。AIは資料の事実抽出を担当し、採点は固定ルールで計算します。これは購入適合性の検討補助であり、不動産鑑定評価や売買価格の査定ではありません。最終判断には管理規約・重要事項調査報告書・長期修繕計画・現地確認が必要です。</p></details>
   <div class="detail-tools"><button class="mini-button" data-add-material="${p.id}">追加資料を撮影して再評価</button><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">現地確認チェック</button></div>
   <p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div>
   <div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">査定情報を編集・再評価</button></div>`;
@@ -512,7 +512,7 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.addMaterial) { $("detailDialog").close(); state.assessmentTargetPropertyId = target.dataset.addMaterial; $("assetFile").value = ""; $("assetSaveStatus").textContent = "この物件の追加資料を撮影してください。"; $("assetDialog").showModal(); }
   if (target.id === "analyzeFlyerBtn") {
     const file = $("assetFile").files?.[0];
-    if (!file) toast("先にマイソクを撮影するか、画像を選択してください。");
+    if (!file) toast("先に分譲マンション資料を撮影するか、画像を選択してください。");
     else await analyzeFlyer(file);
   }
   if (target.id === "backupBtn") $("backupDialog").showModal();

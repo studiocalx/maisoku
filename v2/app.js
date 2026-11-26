@@ -2,7 +2,7 @@ import { allRecords, saveRecord, deleteRecord, getRecord, replaceAllData, export
 import { assessCondominium } from "./assessment.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set(), pendingAssetId: null, assessmentTargetPropertyId: null };
+const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set(), pendingAssetId: null, assessmentTargetPropertyId: null, pendingGemReview: null };
 const HOUSING_REFERENCE = {
   "大阪市": { amount: 40000, confidence: "公式直接確認", areaRule: true, source: "https://www.city.osaka.lg.jp/fukushi/page/0000086902.html" },
   "枚方市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.hirakata.osaka.jp/0000029011.html" },
@@ -251,7 +251,7 @@ async function saveForm(event) {
   if (type === "property") {
     const previous = await getRecord("properties", id);
     const record = {
-      ...previous, id, title: $("pTitle").value.trim(), address: $("pAddress").value.trim(),
+      ...previous, id, gemReview: state.pendingGemReview || previous?.gemReview || null, title: $("pTitle").value.trim(), address: $("pAddress").value.trim(),
       station: $("pStation").value.trim(), walkMinutes: $("pWalk").value === "" ? null : Number($("pWalk").value),
       structureText: $("pStructureText").value.trim(), structureGrade: $("pStructureGrade").value || null,
       structure: $("pStructureGrade").value || null, area: $("pArea").value === "" ? null : Number($("pArea").value),
@@ -332,10 +332,21 @@ async function analyzeFlyer(file) {
       reader.onerror = () => reject(new Error("画像を読み込めませんでした。"));
       reader.readAsDataURL(compressed);
     });
+    const reviewTarget = state.assessmentTargetPropertyId ? await getRecord("properties", state.assessmentTargetPropertyId) : null;
+    const propertyContext = reviewTarget ? {
+      title: reviewTarget.title, address: reviewTarget.address, station: reviewTarget.station,
+      walkMinutes: reviewTarget.walkMinutes, structureText: reviewTarget.structureText,
+      structure: reviewTarget.structure, area: reviewTarget.area, priceYen: reviewTarget.priceYen,
+      minimumBidYen: reviewTarget.minimumBidYen, condoManagementFeeYen: reviewTarget.condoManagementFeeYen,
+      repairReserveYen: reviewTarget.repairReserveYen, arrearsYen: reviewTarget.arrearsYen,
+      occupancy: reviewTarget.occupancy, builtYear: reviewTarget.builtYear,
+      repairPlan: reviewTarget.repairPlan, majorRepairHistory: reviewTarget.majorRepairHistory,
+      pipeUpdateHistory: reviewTarget.pipeUpdateHistory
+    } : null;
     const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg" })
+      body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg", propertyContext })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true || !result.data) {
@@ -356,6 +367,7 @@ async function analyzeFlyer(file) {
       managementCompany: data.management_company || "", elevatorText: data.elevator || "",
       repairPlan: data.repair_plan || "", majorRepairHistory: data.major_repair_history || "",
       pipeUpdateHistory: data.pipe_update_history || "",
+      gemReview: data.review && typeof data.review === "object" ? data.review : null,
       memo: [data.notes, Array.isArray(data.uncertain_fields) && data.uncertain_fields.length ? "AI読み取り要確認: " + data.uncertain_fields.join("、") : ""].filter(Boolean).join("\n")
     };
     if (state.assessmentTargetPropertyId) {
@@ -365,6 +377,7 @@ async function analyzeFlyer(file) {
       for (const [key,value] of Object.entries(extracted)) {
         if (value !== null && value !== undefined && value !== "") merged[key] = value;
       }
+      merged.gemReview = extracted.gemReview || existing.gemReview || null;
       merged.updatedAt = new Date().toISOString();
       await saveRecord("properties", merged);
       asset.propertyId = existing.id;

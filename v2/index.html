@@ -129,7 +129,8 @@
     <form id="assetForm" method="dialog">
       <div class="dialog-head"><div><p class="eyebrow">SAVE ORIGINAL FIRST</p><h2>資料を保存</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>
       <p class="hint" id="assetTargetInfo">画像を選ぶと、まず原画像をこのブラウザ内に保存します。AI読み取りは先頭の1枚を使います。</p>
-      <label class="upload-zone">マイソクを撮影／画像を選択<input id="assetFile" type="file" accept="image/*" capture="environment" multiple></label>
+      <label class="upload-zone">カメラで撮影<input id="assetFileCamera" type="file" accept="image/*" capture="environment" multiple></label>
+      <label class="upload-zone">写真・ファイルから選ぶ<input id="assetFilePick" type="file" accept="image/*" multiple></label>
       <label>資料の種類<select id="assetKind"><option>マイソク</option><option>間取り図</option><option>現地写真</option><option>室内写真</option><option>外観</option><option>周辺写真</option><option>追加資料</option><option>契約資料</option><option>その他</option></select></label>
       <label>ひとことメモ<textarea id="assetMemo" rows="2" placeholder="店名、聞いた話など（任意）"></textarea></label>
       <button id="analyzeFlyerBtn" type="button" class="button button-dark full">AIで読み取り</button>

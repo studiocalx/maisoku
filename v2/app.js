@@ -755,8 +755,11 @@ function openAssetDialog(targetPropertyId = null) {
     : "画像を選ぶと、まず原画像をこのブラウザ内に保存します。AI読み取りは先頭の1枚を使います。読み取り結果を確認してから物件として登録します。";
   $("assetDialog").showModal();
 }
+function selectedAssetFiles() {
+  return [...($("assetFileCamera").files || []), ...($("assetFilePick").files || [])];
+}
 async function saveSelectedImages() {
-  const files = [...($("assetFile").files || [])];
+  const files = selectedAssetFiles();
   if (!files.length) { toast("画像を選択してください。"); return; }
   $("assetSaveStatus").textContent = "原画像を保存しています…";
   let saved = 0;
@@ -1210,7 +1213,7 @@ document.addEventListener("click", async (event) => {
     if (target.id === "compareBtn") { compareProperties(); return; }
     if (target.id === "clearCompareBtn") { state.compareIds.clear(); render(); return; }
     if (target.id === "analyzeFlyerBtn") {
-      const file = $("assetFile").files?.[0];
+      const file = selectedAssetFiles()[0];
       if (!file) toast("先にマイソクを撮影するか、画像を選択してください。");
       else await analyzeFlyer(file);
       return;
@@ -1290,7 +1293,12 @@ $("visitForm").addEventListener("submit", saveVisitForm);
 $("settingsForm").addEventListener("submit", saveSettings);
 $("linkForm").addEventListener("submit", saveLink);
 $("assetForm").addEventListener("submit", async (e) => { e.preventDefault(); try { await saveSelectedImages(); } catch (err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; } });
-$("assetFile").addEventListener("change", () => { $("assetSaveStatus").textContent = $("assetFile").files.length ? `${$("assetFile").files.length}件を選択中。AI読み取りは先頭の1枚を使います。` : ""; });
+function updateAssetSelectionStatus() {
+  const count = selectedAssetFiles().length;
+  $("assetSaveStatus").textContent = count ? `${count}件を選択中。AI読み取りは先頭の1枚を使います。` : "";
+}
+$("assetFileCamera").addEventListener("change", updateAssetSelectionStatus);
+$("assetFilePick").addEventListener("change", updateAssetSelectionStatus);
 $("propertySearch").addEventListener("input", render);
 $("importFile").addEventListener("change", async (e) => {
   const file = e.target.files?.[0];

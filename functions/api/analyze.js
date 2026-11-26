@@ -151,12 +151,11 @@ async function readGeminiError(response) {
   return { body, raw, diagnostic: diagnoseGeminiError(body, response.status) };
 }
 
-function buildPrompt() {
+function buildPrompt(propertyContext = null) {
   return [
-    "あなたは日本の分譲マンション販売資料・重要事項関連資料を読み取るOCRデータ抽出担当です。賃貸物件の募集資料として扱ってはいけません。",
-    "画像に明記された事実だけを抽出してください。資料にない内容を推測・補完・評価しないでください。判断できない値は null にしてください。",
-    "査定・採点・購入推奨は行わず、事実抽出だけを行います。評価はアプリ側のGEM査定エンジンが別途行います。",
-    "金額は円単位の整数。面積は㎡。築年は西暦。徒歩は分数。占有状況や管理状態など、資料に明記がない場合はnull。",
+    "あなたは日本の分譲マンション販売資料・物件概要資料を読み取るOCR担当兼、GEM Ver.2.1に沿った定性レビュー担当です。賃貸募集資料として扱ってはいけません。",
+    "OCR項目は画像に明記された事実だけを抽出してください。資料にない値はnull。推測・補完は禁止です。",
+    "さらにreviewとして、今回画像と既存物件情報に明記された事実だけを根拠に所見を作成します。数値採点は行わず、点数はアプリ側の固定ルールが計算します。",
     "出力は必ず純粋なJSONオブジェクトのみ。",
     "スキーマ:",
     "{",
@@ -167,15 +166,22 @@ function buildPrompt() {
     ' "occupancy": string|null, "built_year": number|null, "total_floors": number|null, "unit_floor": number|null,',
     ' "layout": string|null, "elevator": string|null, "management_company": string|null,',
     ' "repair_plan": string|null, "major_repair_history": string|null, "pipe_update_history": string|null,',
-    ' "notes": string|null, "uncertain_fields": string[]',
+    ' "notes": string|null, "uncertain_fields": string[],',
+    ' "review": { "public_summary": string, "highlights": string[], "expert_question": string, "internal_findings": string[] }',
     "}",
-    "注意:",
-    "- 販売価格と競売の最低買受価格は別項目にする。",
-    "- 管理費と修繕積立金を混同しない。",
+    "抽出ルール:",
+    "- 販売価格と競売の最低買受価格は別項目。管理費と修繕積立金を混同しない。",
     "- 滞納額は資料に明記された場合だけ数値化する。",
-    "- 構造は資料の表記をstructure_textにそのまま抽出し、RC/SRC等の明確な分類が可能な場合だけstructure_gradeを設定する。",
+    "- 構造は資料の表記をstructure_textにそのまま抽出し、明確な分類が可能な場合だけstructure_gradeを設定。",
     "- エレベーター、管理会社、修繕履歴、配管履歴は資料に記載がなければnull。",
-    "- 複数駅・複数価格がある場合はnotesまたはuncertain_fieldsにその旨を記録し、勝手に一つへ決めない。"
+    "- 複数駅・複数価格がある場合はnotesまたはuncertain_fieldsに記録し、勝手に一つへ決めない。",
+    "レビュー規則:",
+    "- GEM指標：構造、EV完結・フロア段差、駅徒歩10分内、周辺インフラ、管理体制、遮音性、洗濯機置場、採光・通風、専有部配管、市場流動性、修繕・清算コスト30万円目標、長期居住・将来規格適合。",
+    "- 資料にない長期修繕・管理状態・配管状態などは必ず未確認とする。未確認を不適合と断定しない。",
+    "- highlightsは確認できる客観的メリットを最大3点。expert_questionは専門的な確認質問を1点。internal_findingsは内部用の懸念・追加確認事項。",
+    "- 地域の市場価格や法令適合性を外部調査なしに断定しない。購入推奨を断定しない。",
+    "既存物件情報（今回画像のOCR抽出値ではなく、照合用コンテキスト）:",
+    JSON.stringify(propertyContext && typeof propertyContext === "object" ? propertyContext : {})
   ].join("\n");
 }
 
@@ -236,7 +242,7 @@ export async function onRequestPost(context) {
   }
 
   const candidates = await getCandidateModels(apiKey, context);
-  const prompt = buildPrompt();
+  const prompt = buildPrompt(body?.propertyContext);
 
   const attemptedModels = [];
   const rateLimitErrors = [];

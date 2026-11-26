@@ -284,6 +284,7 @@ async function analyzeFlyer(file) {
     toast("読み取り結果を入力欄に反映しました。確認して保存してください。");
   } catch (error) {
     status.textContent = "AI読み取りは完了しませんでした。原画像は保存済みです。未整理資料から後で確認できます。";
+    await refresh();
     toast(error.message || "AI読み取りに失敗しました。");
   } finally {
     button.disabled = false;
@@ -421,6 +422,12 @@ document.addEventListener("click", async (event) => {
   }
 });
 $("detailDialog").addEventListener("close", () => clearObjectUrls(detailObjectUrls));
+$("recordDialog").addEventListener("close", () => {
+  if (state.pendingAssetId) {
+    state.pendingAssetId = null;
+    toast("物件登録を中止しました。原画像は未整理資料に保存されています。");
+  }
+});
 $("recordForm").addEventListener("submit", saveForm);
 $("assetLinkForm").addEventListener("submit", async e => { try { await saveAssetLink(e); } catch (err) { toast("紐付けに失敗しました: " + err.message); } });
 $("assetForm").addEventListener("submit", async e => { e.preventDefault(); try { await saveSelectedImages([...$("assetFile").files]); } catch(err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; } });

@@ -31,8 +31,8 @@ export function assessCondominium(property={}) {
   let verdict = "判定保留";
   if (coverage>=60 && !coreMissing) verdict = score>=80?"◎":score>=65?"◯":score>=45?"△":"☓";
   let strategy = "継続検討";
-  if (verdict==="◎" || verdict==="◯") strategy="採用候補";
-  if (verdict==="☓") strategy="却下候補";
+  if (verdict==="◎" || verdict==="◯") strategy="採用";
+  if (verdict==="☓") strategy="却下";
   const missing = items.filter(x=>x.points===null).map(x=>x.label);
   const risks = [];
   if (Number(property.arrearsYen)>0) risks.push("管理費・修繕積立金等の滞納額が記載されています。金額と承継関係を確認してください。");

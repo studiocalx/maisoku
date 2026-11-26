@@ -283,6 +283,7 @@ async function saveForm(event) {
       if (asset) { asset.propertyId = id; await saveRecord("assets", asset); }
       state.pendingAssetId = null;
     }
+    state.pendingGemReview = null;
   } else {
     const previous = await getRecord("visits", id);
     await saveRecord("visits", { ...previous, id, date: $("vDate").value, place: $("vPlace").value.trim(), memo: $("vMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now });
@@ -548,6 +549,7 @@ $("detailDialog").addEventListener("close", () => clearObjectUrls(detailObjectUr
 $("recordDialog").addEventListener("close", () => {
   if (state.pendingAssetId) {
     state.pendingAssetId = null;
+    state.pendingGemReview = null;
     toast("物件登録を中止しました。原画像は未整理資料に保存されています。");
   }
 });

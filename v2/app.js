@@ -2,7 +2,7 @@ import { allRecords, saveRecord, deleteRecord, getRecord, replaceAllData, export
 import { assessCondominium } from "./assessment.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set(), pendingAssetId: null };
+const state = { tab: "properties", properties: [], visits: [], assets: [], compareIds: new Set(), pendingAssetId: null, assessmentTargetPropertyId: null };
 const HOUSING_REFERENCE = {
   "大阪市": { amount: 40000, confidence: "公式直接確認", areaRule: true, source: "https://www.city.osaka.lg.jp/fukushi/page/0000086902.html" },
   "枚方市": { amount: 38000, confidence: "公式制度資料との対応確認", areaRule: "可能性あり・金額未確認", source: "https://www.city.hirakata.osaka.jp/0000029011.html" },
@@ -98,7 +98,7 @@ function openPropertyForm(record = null) {
   $("pUnitFloor").value = record?.unitFloor ?? "";
   $("pElevatorAccess").value = record?.elevatorAccess || "";
   $("pInfrastructure").value = record?.infrastructure || "";
-  $("pManagementStatus").value = record?.managementStatus || "";
+  $("pManagementStatus").value = record?.managementStatus || "";\n  $("pMaintenanceCostStatus").value = record?.maintenanceCostStatus || "";
   $("pNoiseStatus").value = record?.noiseStatus || "";
   $("pLaundryPlacement").value = record?.laundryPlacement || "";
   $("pLivingEnvironment").value = record?.livingEnvironment || "";
@@ -106,7 +106,7 @@ function openPropertyForm(record = null) {
   $("pMarketLiquidity").value = record?.marketLiquidity || "";
   $("pRepairCost").value = record?.repairCost ?? "";
   $("pAssetRetention").value = record?.assetRetention || "";
-  $("pRepairPlan").value = record?.repairPlan || "";
+  $("pRepairPlan").value = record?.repairPlan || "";\n  $("pManagementCompany").value = record?.managementCompany || "";\n  $("pElevatorText").value = record?.elevatorText || "";\n  $("pMajorRepairHistory").value = record?.majorRepairHistory || "";
   $("pPipeUpdateHistory").value = record?.pipeUpdateHistory || "";
   $("pRegion").value = record?.region || "";
   $("pParking").value = record?.parkingFee ?? "";
@@ -218,7 +218,7 @@ async async function showProperty(id) {
   <h3>詳細確認事項・未確認項目</h3><ul>${appraisal.missing.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>採点対象の必須項目は入力済みです。資料原本との照合は続けてください。</li>"}</ul>
   <h3>リスク・注意事項</h3><ul>${appraisal.risks.map(x=>`<li>${escapeHtml(x)}</li>`).join("") || "<li>入力済み項目から重大な警告は検出されていません。未確認項目がないことを意味しません。</li>"}</ul>
   <p class="hint">配点はGEM Ver.2.1に数値指定がないため、現段階の実装用仮配点です。AIは資料の事実抽出を担当し、採点は固定ルールで計算します。最終判断には管理規約・重要事項調査報告書・長期修繕計画・現地確認が必要です。</p>
-  <div class="detail-tools"><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">現地確認チェック</button></div>
+  <div class="detail-tools"><button class="mini-button" data-add-material="${p.id}">追加資料を撮影して再評価</button><button class="mini-button" data-checklist="${p.id}" data-kind="viewing">現地確認チェック</button></div>
   <p class="detail-memo">${escapeHtml(p.memo || "メモはありません。")}</p><h3>関連資料（${assets.length}件）</h3><div class="asset-grid">${assets.map(a=>`<div class="asset-card"><img data-detail-image="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind)}</b><span>${escapeHtml(a.name)}</span></div></div>`).join("")}</div>
   <div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button><button class="button button-dark" data-edit-property="${p.id}">査定情報を編集・再評価</button></div>`;
   for (const a of assets) {
@@ -253,13 +253,13 @@ async async function saveForm(event) {
       totalFloors: $("pTotalFloors").value === "" ? null : Number($("pTotalFloors").value),
       unitFloor: $("pUnitFloor").value === "" ? null : Number($("pUnitFloor").value),
       occupancy: $("pOccupancy").value.trim(), elevatorAccess: $("pElevatorAccess").value || null,
-      infrastructure: $("pInfrastructure").value || null, managementStatus: $("pManagementStatus").value || null,
+      infrastructure: $("pInfrastructure").value || null, managementStatus: $("pManagementStatus").value || null,\n      maintenanceCostStatus: $("pMaintenanceCostStatus").value || null,
       noiseStatus: $("pNoiseStatus").value || null, laundryPlacement: $("pLaundryPlacement").value || null,
       livingEnvironment: $("pLivingEnvironment").value || null, pipeRenewal: $("pPipeRenewal").value || null,
       marketLiquidity: $("pMarketLiquidity").value || null,
       repairCost: $("pRepairCost").value === "" ? null : Number($("pRepairCost").value),
       assetRetention: $("pAssetRetention").value || null,
-      repairPlan: $("pRepairPlan").value.trim(), pipeUpdateHistory: $("pPipeUpdateHistory").value.trim(),
+      repairPlan: $("pRepairPlan").value.trim(), pipeUpdateHistory: $("pPipeUpdateHistory").value.trim(),\n      managementCompany: $("pManagementCompany").value.trim(), elevatorText: $("pElevatorText").value.trim(),\n      majorRepairHistory: $("pMajorRepairHistory").value.trim(),
       memo: $("pMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now
     };
     await saveRecord("properties", record);
@@ -272,7 +272,7 @@ async async function saveForm(event) {
     const previous = await getRecord("visits", id);
     await saveRecord("visits", { ...previous, id, date: $("vDate").value, place: $("vPlace").value.trim(), memo: $("vMemo").value.trim(), createdAt: previous?.createdAt || now, updatedAt: now });
   }
-  $("recordDialog").close(); await refresh(); toast("記録を保存しました。");
+  $("recordDialog").close(); await refresh(); toast("査定情報を保存しました。");\n  if (type === "property") await showProperty(id);
 }
 async function analyzeFlyer(file) {
   if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) {
@@ -328,30 +328,51 @@ async function analyzeFlyer(file) {
     }
     const data = result.data;
     const numberOrNull = value => Number.isFinite(Number(value)) && value !== null && value !== "" ? Number(value) : null;
-    const draft = {
-      isOcrDraft: true,
-      title: data.title || "",
-      address: data.address || "",
-      rent: numberOrNull(data.rent_yen),
-      fee: numberOrNull(data.management_fee_yen),
-      station: data.station || "",
-      walkMinutes: numberOrNull(data.walk_minutes),
-      layout: data.layout || "",
-      area: numberOrNull(data.area_sqm),
-      deposit: data.deposit || "",
-      keyMoney: data.key_money || "",
-      builtYear: numberOrNull(data.built_year),
-      structure: data.structure || "",
-      memo: [data.notes, data.confidence_note ? "AI読み取り補足: " + data.confidence_note : ""].filter(Boolean).join("\n")
+    const extracted = {
+      title: data.title || "", address: data.address || "", station: data.station || "",
+      walkMinutes: numberOrNull(data.walk_minutes), structureText: data.structure_text || "",
+      structure: data.structure_grade || null, structureGrade: data.structure_grade || null,
+      area: numberOrNull(data.area_sqm), priceYen: numberOrNull(data.price_yen),
+      minimumBidYen: numberOrNull(data.minimum_bid_yen),
+      condoManagementFeeYen: numberOrNull(data.condo_management_fee_yen),
+      repairReserveYen: numberOrNull(data.repair_reserve_yen), arrearsYen: numberOrNull(data.arrears_yen),
+      occupancy: data.occupancy || "", builtYear: numberOrNull(data.built_year),
+      totalFloors: numberOrNull(data.total_floors), unitFloor: numberOrNull(data.unit_floor),
+      managementCompany: data.management_company || "", elevatorText: data.elevator || "",
+      repairPlan: data.repair_plan || "", majorRepairHistory: data.major_repair_history || "",
+      pipeUpdateHistory: data.pipe_update_history || "",
+      memo: [data.notes, Array.isArray(data.uncertain_fields) && data.uncertain_fields.length ? "AI読み取り要確認: " + data.uncertain_fields.join("、") : ""].filter(Boolean).join("\n")
     };
+    if (state.assessmentTargetPropertyId) {
+      const existing = await getRecord("properties", state.assessmentTargetPropertyId);
+      if (!existing) throw new Error("再評価する物件が見つかりません。");
+      const merged = { ...existing };
+      for (const [key,value] of Object.entries(extracted)) {
+        if (value !== null && value !== undefined && value !== "") merged[key] = value;
+      }
+      merged.updatedAt = new Date().toISOString();
+      await saveRecord("properties", merged);
+      asset.propertyId = existing.id;
+      await saveRecord("assets", asset);
+      state.assessmentTargetPropertyId = null;
+      $("assetDialog").close();
+      $("assetFile").value = "";
+      $("assetMemo").value = "";
+      await refresh();
+      await showProperty(existing.id);
+      status.textContent = "追加資料を反映し、GEM評価を更新しました。";
+      toast("追加資料を統合して再評価しました。");
+      return;
+    }
+    const draft = { isOcrDraft: true, ...extracted };
     state.pendingAssetId = asset.id;
     $("assetDialog").close();
     setTab("properties");
     openPropertyForm(draft);
     $("assetFile").value = "";
     $("assetMemo").value = "";
-    status.textContent = "AI読み取り完了。原本と照合してから保存してください。";
-    toast("読み取り結果を入力欄に反映しました。確認して保存してください。");
+    status.textContent = "読み取り完了。原本と照合してから査定情報を保存してください。";
+    toast("分譲マンション情報を読み取りました。確認して保存してください。");
   } catch (error) {
     status.textContent = asset
       ? "AI読み取りは完了しませんでした。原画像は保存済みです。未整理資料から後で確認できます。"
@@ -360,7 +381,7 @@ async function analyzeFlyer(file) {
     toast(error.message || "AI読み取りに失敗しました。");
   } finally {
     button.disabled = false;
-    button.textContent = "マイソクをAIで読み取り、物件登録へ";
+    button.textContent = "分譲資料をAIで読み取り、GEM査定";
   }
 }
 
@@ -472,7 +493,7 @@ document.addEventListener("click", async (event) => {
   if (target.hasAttribute("data-close")) { target.closest("dialog")?.close(); }
   if (target.id === "visitBtn") openVisitForm();
   if (target.id === "propertyBtn") openPropertyForm();
-  if (target.id === "captureBtn") $("assetDialog").showModal();
+  if (target.id === "captureBtn") { state.assessmentTargetPropertyId = null; $("assetDialog").showModal(); }\n  if (target.dataset.addMaterial) { state.assessmentTargetPropertyId = target.dataset.addMaterial; $("assetFile").value = ""; $("assetSaveStatus").textContent = "この物件の追加資料を撮影してください。"; $("assetDialog").showModal(); }
   if (target.id === "analyzeFlyerBtn") {
     const file = $("assetFile").files?.[0];
     if (!file) toast("先にマイソクを撮影するか、画像を選択してください。");

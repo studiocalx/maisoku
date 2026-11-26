@@ -162,16 +162,22 @@ function compareProperties() {
   const items = state.properties.filter(p => state.compareIds.has(p.id));
   if (items.length < 2) return toast("比較する物件を2件以上選んでください。");
   const rows = [
-    ["地域", p => p.region || "未設定"], ["所在地", p => p.address || "未確認"],
-    ["賃料", p => p.rent == null ? "未確認" : yen(p.rent)],
-    ["管理費等", p => p.fee == null ? "未確認" : yen(p.fee)],
-    ["駐輪・駐車場", p => p.parkingFee == null ? "未確認" : yen(p.parkingFee)],
-    ["月額合計", p => [p.rent,p.fee,p.parkingFee].some(v=>v!=null) ? yen(Number(p.rent||0)+Number(p.fee||0)+Number(p.parkingFee||0)) : "未確認"],
-    ["最寄駅", p => p.station || "未確認"], ["駅徒歩", p => p.walkMinutes ? p.walkMinutes+"分" : "未確認"],
-    ["間取り", p => p.layout || "未確認"], ["専有面積", p => p.area ? p.area+"㎡" : "未確認"],
-    ["敷金", p => p.deposit || "未確認"], ["礼金", p => p.keyMoney || "未確認"],
-    ["築年", p => p.builtYear ? p.builtYear+"年" : "未確認"], ["構造・階数", p => p.structure || "未確認"],
-    ["検討状態", p => p.status || "未整理"], ["メモ", p => p.memo || "—"]
+    ["所在地", p => p.address || "未確認"],
+    ["販売価格", p => p.priceYen == null ? "未確認" : yen(p.priceYen)],
+    ["最低買受価格", p => p.minimumBidYen == null ? "未確認" : yen(p.minimumBidYen)],
+    ["構造", p => p.structureText || "未確認"],
+    ["築年", p => p.builtYear || "未確認"],
+    ["専有面積", p => p.area == null ? "未確認" : p.area+"㎡"],
+    ["最寄駅・徒歩", p => (p.station || "未確認") + (p.walkMinutes != null ? "・徒歩"+p.walkMinutes+"分" : "")],
+    ["管理費（月額）", p => p.condoManagementFeeYen == null ? "未確認" : yen(p.condoManagementFeeYen)],
+    ["修繕積立金（月額）", p => p.repairReserveYen == null ? "未確認" : yen(p.repairReserveYen)],
+    ["滞納額", p => p.arrearsYen == null ? "未確認" : yen(p.arrearsYen)],
+    ["占有状況", p => p.occupancy || "未確認"],
+    ["管理・共用部", p => p.managementStatus || "未確認"],
+    ["専有部配管", p => p.pipeRenewal || "未確認"],
+    ["修繕・清算コスト", p => p.repairCost == null ? "未確認" : yen(p.repairCost)],
+    ["GEM適合スコア", p => { const a=assessCondominium(p); return a.score == null ? "未採点" : a.score+"/100（充足率"+a.coverage+"%）"; }],
+    ["GEM総合判定", p => assessCondominium(p).verdict]
   ];
   $("compareContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">SIDE BY SIDE</p><h2>物件比較</h2></div><button class="icon-button" data-close>×</button></div><div class="compare-table-wrap"><table class="compare-table"><thead><tr><th>比較項目</th>${items.map(p=>`<th>${escapeHtml(p.title || "名称未設定")}</th>`).join("")}</tr></thead><tbody>${rows.map(([label,fn])=>`<tr><th>${label}</th>${items.map(p=>`<td>${escapeHtml(fn(p))}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="hint">未確認項目は空欄や推測で補わず、そのまま比較表示しています。点数による自動順位付けは行いません。</p><div class="dialog-actions"><button class="button button-quiet" data-close>閉じる</button></div>`;
   $("compareDialog").showModal();

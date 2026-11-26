@@ -10,8 +10,8 @@ export const GEM_CRITERIA = [
   { key:"laundryPlacement", label:"洗濯機置場", weight:4, score:v=>({ "室内":4,"バルコニー":3,"なし・要工事":0 }[v]??null) },
   { key:"livingEnvironment", label:"採光・通風", weight:8, score:v=>({ "良好":8,"概ね良好":6,"要確認":3,"問題あり":0 }[v]??null) },
   { key:"pipeRenewal", label:"専有部配管の更新・更新可否", weight:10, score:v=>({ "更新済み":10,"更新可能":8,"一部確認":5,"未確認":null,"更新困難":0 }[v]??null) },
-  { key:"marketLiquidity", label:"市場流動性（再販・賃貸）", weight:6, score:v=>({ "高い":8,"標準":6,"低い":2,"未確認":null }[v]??null) },
-  { key:"repairCost", label:"修繕・清算コスト（目標30万円）", weight:5, score:v=>Number.isFinite(Number(v))?(Number(v)<=300000?7:Number(v)<=500000?4:0):null },
+  { key:"marketLiquidity", label:"市場流動性（再販・賃貸）", weight:6, score:v=>({ "高い":6,"標準":4,"低い":1,"未確認":null }[v]??null) },
+  { key:"repairCost", label:"修繕・清算コスト（目標30万円）", weight:5, score:v=>has(v)&&Number.isFinite(Number(v))?(Number(v)<=300000?5:Number(v)<=500000?3:0):null },
   { key:"maintenanceCostStatus", label:"管理費・修繕積立金の長期負担", weight:5, score:v=>({ "軽い":5,"標準":4,"重い":1,"要確認":null }[v]??null) },\n  { key:"assetRetention", label:"長期居住・将来規格への適合", weight:4, score:v=>({ "適合":5,"概ね適合":4,"要確認":2,"不適合":0 }[v]??null) }
 ];
 

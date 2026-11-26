@@ -75,7 +75,10 @@
         <label>占有状況<input id="pOccupancy" maxlength="100" placeholder="例：空室・所有者居住・賃貸中"></label>
         <label>昇降機・段差<select id="pElevatorAccess"><option value="">未確認</option><option>EV完結・段差なし</option><option>EVあり・一部段差</option><option>EVなし</option><option>問題あり</option></select></label>
         <label>周辺インフラ<select id="pInfrastructure"><option value="">未確認</option><option>充実</option><option>概ね充実</option><option>どちらか不足</option><option>不足</option></select></label>
-        <label>管理費・修繕積立金の負担<select id="pMaintenanceCostStatus"><option value="">未確認</option><option>軽い</option><option>標準</option><option>重い</option><option>要確認</option></select></label>\n        <label>管理会社<input id="pManagementCompany" maxlength="140"></label>\n        <label>エレベーター資料記載<input id="pElevatorText" maxlength="100" placeholder="例：あり・停止階"></label>\n        <label>管理費・修繕積立金の負担<select id="pMaintenanceCostStatus"><option value="">未確認</option><option>軽い</option><option>標準</option><option>重い</option><option>要確認</option></select></label>\n        <label>管理体制・共用部<select id="pManagementStatus"><option value="">未確認</option><option>良好</option><option>概ね良好</option><option>要確認</option><option>問題あり</option></select></label>
+        <label>管理費・修繕積立金の負担<select id="pMaintenanceCostStatus"><option value="">未確認</option><option>軽い</option><option>標準</option><option>重い</option><option>要確認</option></select></label>
+        <label>管理会社<input id="pManagementCompany" maxlength="140"></label>
+        <label>エレベーター資料記載<input id="pElevatorText" maxlength="100" placeholder="例：あり・停止階"></label>
+        <label>管理体制・共用部<select id="pManagementStatus"><option value="">未確認</option><option>良好</option><option>概ね良好</option><option>要確認</option><option>問題あり</option></select></label>
         <label>遮音・外部騒音<select id="pNoiseStatus"><option value="">未確認</option><option>良好</option><option>許容範囲</option><option>要確認</option><option>問題あり</option></select></label>
         <label>洗濯機置場<select id="pLaundryPlacement"><option value="">未確認</option><option>室内</option><option>バルコニー</option><option>なし・要工事</option></select></label>
         <label>採光・通風<select id="pLivingEnvironment"><option value="">未確認</option><option>良好</option><option>概ね良好</option><option>要確認</option><option>問題あり</option></select></label>
@@ -83,12 +86,9 @@
         <label>市場流動性<select id="pMarketLiquidity"><option value="">未確認</option><option>高い</option><option>標準</option><option>低い</option></select></label>
         <label>推定修繕・清算コスト（円）<input id="pRepairCost" type="number" min="0" step="10000" placeholder="目標30万円以内"></label>
         <label>長期居住・将来規格適合<select id="pAssetRetention"><option value="">未確認</option><option>適合</option><option>概ね適合</option><option>要確認</option><option>不適合</option></select></label>
-        <label class="wide">管理会社<input id="pManagementCompany" maxlength="140"></label>
-        <label>エレベーター資料記載<input id="pElevatorText" maxlength="100" placeholder="例：あり・停止階"></label>
-        <label>管理費・修繕積立金の負担<select id="pMaintenanceCostStatus"><option value="">未確認</option><option>軽い</option><option>標準</option><option>重い</option><option>要確認</option></select></label>
         <label class="wide">長期修繕計画<textarea id="pRepairPlan" rows="2" placeholder="計画の進捗・積立状況・管理会社への確認内容"></textarea></label>
         <label class="wide">大規模修繕履歴<textarea id="pMajorRepairHistory" rows="2" placeholder="実施時期・工事内容・次回予定"></textarea></label>
-        <label class="wide">大規模修繕履歴<textarea id="pMajorRepairHistory" rows="2" placeholder="実施時期・工事内容・次回予定"></textarea></label>\n        <label class="wide">専有部配管の更新履歴<textarea id="pPipeUpdateHistory" rows="2" placeholder="資料記載・確認内容"></textarea></label>
+        <label class="wide">専有部配管の更新履歴<textarea id="pPipeUpdateHistory" rows="2" placeholder="資料記載・確認内容"></textarea></label>
         <label class="wide">メモ・追加資料で判明した条件<textarea id="pMemo" rows="3" placeholder="不動産会社への質問、交渉中の条件変更など"></textarea></label>
         <div class="hidden">
           <input id="pRegion"><input id="pParking"><input id="pRent"><input id="pFee"><input id="pLayout"><input id="pDeposit"><input id="pKeyMoney"><input id="pStructure"><input id="pStatus"><select id="pVisit"></select>
@@ -126,7 +126,8 @@
       <div class="dialog-actions"><button type="button" class="button button-quiet" data-close>キャンセル</button><button type="submit" class="button button-dark">この物件に紐付ける</button></div>
     </form>
   </dialog>
-  <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>\n  <dialog id="compareDialog" class="dialog"><div id="compareContent"></div></dialog>
+  <dialog id="detailDialog" class="dialog"><div id="detailContent"></div></dialog>
+  <dialog id="compareDialog" class="dialog"><div id="compareContent"></div></dialog>
   <dialog id="checklistDialog" class="dialog"><div id="checklistContent"></div></dialog>
   <dialog id="backupDialog" class="dialog">
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>データ管理</h2></div><button type="button" class="icon-button" data-close aria-label="閉じる">×</button></div>

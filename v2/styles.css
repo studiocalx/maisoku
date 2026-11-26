@@ -30,3 +30,7 @@
 .gem-coverage b{display:block;font-size:24px;color:var(--ink);margin-top:4px}
 .gem-coverage p{line-height:1.5;margin:5px 0 0}
 @media(max-width:520px){.gem-score-panel{grid-template-columns:1fr}.gem-coverage{padding:10px 0 0;border-left:0;border-top:1px solid #c9ceb4}}
+
+.gem-private{margin:18px 0;border:1px solid var(--line);border-radius:14px;padding:13px;background:#fffefa}
+.gem-private summary{font-size:13px;font-weight:800;cursor:pointer}
+.gem-private[open] summary{margin-bottom:14px}

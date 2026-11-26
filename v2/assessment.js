@@ -29,7 +29,7 @@ export function assessCondominium(property={}) {
   const score = availableWeight ? Math.round(earned/availableWeight*100) : null;
   const coreMissing = ["structure","managementStatus","repairCost"].some(k=>!has(property[k]));
   let verdict = "判定保留";
-  if (coverage>=60 && !coreMissing) verdict = score>=80?"◎":score>=65?"◯":score>=45?"△":"☓";
+  if (coverage>=80 && !coreMissing) verdict = score>=80?"◎":score>=65?"◯":score>=45?"△":"☓";
   let strategy = "継続検討";
   if (verdict==="◎" || verdict==="◯") strategy="採用";
   if (verdict==="☓") strategy="却下";

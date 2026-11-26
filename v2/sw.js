@@ -1,5 +1,5 @@
-const CACHE_NAME = "maisoku-ai-2-shell-v4";
-const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./assessment.js", "./db.js", "./manifest.json"];
+const CACHE_NAME = "maisoku-ai-2-rental-v1";
+const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./db.js", "./criteria.js", "./evaluation.js", "./manifest.json"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_FILES)));
   self.skipWaiting();

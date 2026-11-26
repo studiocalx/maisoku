@@ -1,25 +1,58 @@
 const DB_NAME = "maisoku-ai-2";
-const DB_VERSION = 1;
-const STORES = ["properties", "visits", "assets"];
+const DB_VERSION = 2;
+
+export const STORES = [
+  "areas",
+  "areaEvaluations",
+  "agencies",
+  "visits",
+  "properties",
+  "assets",
+  "extractions",
+  "aiAnalyses",
+  "propertyEvaluations",
+  "checklistRecords",
+  "settings"
+];
+
+const INDEXES = {
+  areas: ["updatedAt"],
+  areaEvaluations: ["areaId", "createdAt"],
+  agencies: ["updatedAt"],
+  visits: ["date", "areaId"],
+  properties: ["updatedAt", "areaId"],
+  assets: ["propertyId", "visitId", "areaId", "createdAt"],
+  extractions: ["propertyId", "assetId", "createdAt"],
+  aiAnalyses: ["propertyId", "createdAt"],
+  propertyEvaluations: ["propertyId", "createdAt"],
+  checklistRecords: ["propertyId"],
+  settings: []
+};
+
+function assertStore(storeName) {
+  if (!STORES.includes(storeName)) throw new Error("不正な保存先です。");
+}
 
 export function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains("properties")) {
-        const store = db.createObjectStore("properties", { keyPath: "id" });
-        store.createIndex("updatedAt", "updatedAt");
-        store.createIndex("visitId", "visitId");
-      }
-      if (!db.objectStoreNames.contains("visits")) {
-        const store = db.createObjectStore("visits", { keyPath: "id" });
-        store.createIndex("date", "date");
-      }
-      if (!db.objectStoreNames.contains("assets")) {
-        const store = db.createObjectStore("assets", { keyPath: "id" });
-        store.createIndex("propertyId", "propertyId");
-        store.createIndex("createdAt", "createdAt");
+      const tx = request.transaction;
+      for (const name of STORES) {
+        let store;
+        if (!db.objectStoreNames.contains(name)) {
+          store = db.createObjectStore(name, { keyPath: "id" });
+        } else if (tx) {
+          store = tx.objectStore(name);
+        } else {
+          continue;
+        }
+        for (const indexName of INDEXES[name] || []) {
+          if (!store.indexNames.contains(indexName)) {
+            store.createIndex(indexName, indexName);
+          }
+        }
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -29,6 +62,7 @@ export function openDatabase() {
 }
 
 export async function allRecords(storeName) {
+  assertStore(storeName);
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readonly");
@@ -41,7 +75,7 @@ export async function allRecords(storeName) {
 }
 
 export async function saveRecord(storeName, record) {
-  if (!STORES.includes(storeName)) throw new Error("不正な保存先です。");
+  assertStore(storeName);
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readwrite");
@@ -53,7 +87,7 @@ export async function saveRecord(storeName, record) {
 }
 
 export async function deleteRecord(storeName, id) {
-  if (!STORES.includes(storeName)) throw new Error("不正な削除先です。");
+  assertStore(storeName);
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readwrite");
@@ -65,7 +99,7 @@ export async function deleteRecord(storeName, id) {
 }
 
 export async function getRecord(storeName, id) {
-  if (!STORES.includes(storeName)) throw new Error("不正な参照先です。");
+  assertStore(storeName);
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readonly");
@@ -85,7 +119,7 @@ export async function replaceAllData(data) {
     for (const name of STORES) {
       const store = tx.objectStore(name);
       store.clear();
-      for (const item of (Array.isArray(data[name]) ? data[name] : [])) store.put(item);
+      for (const item of (data && Array.isArray(data[name]) ? data[name] : [])) store.put(item);
     }
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { const error = tx.error; db.close(); reject(error); };
@@ -96,7 +130,7 @@ export async function replaceAllData(data) {
 export async function exportAllData() {
   const data = {};
   for (const name of STORES) data[name] = await allRecords(name);
-  return { app: "maisoku-ai-2", version: 1, exportedAt: new Date().toISOString(), ...data };
+  return { app: "maisoku-ai-2", version: 2, exportedAt: new Date().toISOString(), ...data };
 }
 
 export async function saveImageAsset(file, metadata = {}) {
@@ -110,6 +144,8 @@ export async function saveImageAsset(file, metadata = {}) {
     kind: metadata.kind || "マイソク",
     memo: metadata.memo || "",
     propertyId: metadata.propertyId || null,
+    visitId: metadata.visitId || null,
+    areaId: metadata.areaId || null,
     createdAt: new Date().toISOString()
   };
   await saveRecord("assets", record);

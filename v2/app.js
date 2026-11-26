@@ -207,7 +207,7 @@ async function saveForm(event) {
   $("recordDialog").close(); await refresh(); toast("記録を保存しました。");
 }
 async function analyzeFlyer(file) {
-  if (!file || !/^image\\/(jpeg|png|webp)$/i.test(file.type || "")) {
+  if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) {
     toast("JPEG・PNG・WebPのマイソク画像を選択してください。");
     return;
   }

@@ -806,10 +806,20 @@ async function analyzeFlyer(file) {
   button.disabled = true;
   button.textContent = "原画像を保存しています…";
   let asset = null;
+  let waitTimer = null;
   const targetId = state.assetTargetPropertyId;
   try {
     asset = await saveImageAsset(file, { kind: $("assetKind").value || "マイソク", memo: $("assetMemo").value.trim(), propertyId: targetId || null });
     status.textContent = "原画像を保存しました。AIで項目を読み取っています…";
+    const waitStartedAt = Date.now();
+    waitTimer = setInterval(() => {
+      const sec = Math.floor((Date.now() - waitStartedAt) / 1000);
+      if (sec >= 45) {
+        status.textContent = `AIで項目を読み取っています…（${sec}秒経過）混雑しています。サーバー側で再試行中です。混雑時は1〜2分かかることがあります。そのままお待ちください。`;
+      } else if (sec >= 15) {
+        status.textContent = `AIで項目を読み取っています…（${sec}秒経過）混雑時は時間がかかることがあります。`;
+      }
+    }, 5000);
     const compressed = await compressImage(file);
     if (compressed.size > 12 * 1024 * 1024) throw new Error("圧縮後も12MBを超えています。画像を小さくしてください。");
     const base64 = await blobToBase64(compressed);
@@ -878,6 +888,7 @@ async function analyzeFlyer(file) {
     status.textContent = (error.message || "AI読み取りに失敗しました。") + "\n原画像は保存済みです。AI読み取りはオンライン時のみ利用できます。";
     toast("AI読み取りは完了しませんでした。原画像は保存済みです。");
   } finally {
+    if (waitTimer) clearInterval(waitTimer);
     button.disabled = false;
     button.textContent = "AIで読み取り";
   }

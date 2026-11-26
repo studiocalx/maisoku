@@ -503,7 +503,7 @@ document.addEventListener("click", async (event) => {
   if (target.id === "visitBtn") openVisitForm();
   if (target.id === "propertyBtn") openPropertyForm();
   if (target.id === "captureBtn") { state.assessmentTargetPropertyId = null; $("assetDialog").showModal(); }
-  if (target.dataset.addMaterial) { state.assessmentTargetPropertyId = target.dataset.addMaterial; $("assetFile").value = ""; $("assetSaveStatus").textContent = "この物件の追加資料を撮影してください。"; $("assetDialog").showModal(); }
+  if (target.dataset.addMaterial) { $("detailDialog").close(); state.assessmentTargetPropertyId = target.dataset.addMaterial; $("assetFile").value = ""; $("assetSaveStatus").textContent = "この物件の追加資料を撮影してください。"; $("assetDialog").showModal(); }
   if (target.id === "analyzeFlyerBtn") {
     const file = $("assetFile").files?.[0];
     if (!file) toast("先にマイソクを撮影するか、画像を選択してください。");

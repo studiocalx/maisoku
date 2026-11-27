@@ -25,6 +25,7 @@ const state = {
   compareIds: new Set(),
   detailId: null, detailTab: "summary",
   assetTargetPropertyId: null,
+  continuousSavedCount: 0,
   pendingDiff: null,
   checklistWork: null,
   areaDetailId: null
@@ -32,6 +33,7 @@ const state = {
 
 let toastTimer;
 let objectUrls = [];
+const batchState = { running: false, total: 0, done: 0, notice: null };
 function clearObjectUrls() { for (const u of objectUrls) URL.revokeObjectURL(u); objectUrls = []; }
 function toast(message) {
   $("toast").textContent = message;
@@ -106,6 +108,8 @@ async function refresh() {
   $("areaCount").textContent = areas.length;
   $("visitCount").textContent = visits.length;
   $("assetCount").textContent = assets.filter(a => !a.propertyId && !a.visitId && !a.areaId).length;
+  const unreadCount = unreadAssetList().length;
+  $("assetsTabBtn").textContent = unreadCount ? `未整理資料（未読${unreadCount}）` : "未整理資料";
   render();
 }
 function setTab(tab) {
@@ -151,13 +155,47 @@ function renderVisits() {
   const agencies = sortNewest(state.agencies);
   $("agenciesList").innerHTML = agencies.length ? agencies.map(a => `<article class="record-card"><button class="record-main" data-detail-agency="${a.id}"><strong>${escapeHtml(a.name || "会社名未設定")}</strong><span class="record-sub">${escapeHtml(areaName(a.areaId) || "")}${a.address ? " / " + escapeHtml(a.address) : ""}</span></button><button class="mini-button" data-edit-agency="${a.id}">編集</button></article>`).join("") : emptyState("不動産会社はまだ登録されていません。", "訪問した会社を登録すると、物件や訪問記録に紐付けられます。");
 }
+/* ---------- 未読み取り（保存済み・未解析）資料 ---------- */
+function hasExtractionFor(assetId) { return state.extractions.some(e => e.assetId === assetId); }
+function isUnreadCandidate(a) {
+  // 訪問写真と現地写真（チェックリスト写真）はマイソク読み取りの対象外。それ以外の保存済み資料が対象。
+  return !!a && !a.visitId && a.kind !== "現地写真";
+}
+function unreadAssetList() {
+  const ids = new Set(state.extractions.map(e => e.assetId));
+  return sortNewest(state.assets.filter(a => isUnreadCandidate(a) && !ids.has(a.id)), "createdAt");
+}
+function assetAnalyzeButtons(a) {
+  return hasExtractionFor(a.id)
+    ? `<button class="mini-button" data-review-asset="${a.id}">結果を確認</button>`
+    : `<button class="mini-button" data-analyze-asset="${a.id}">AIで読み取り</button>`;
+}
+function renderUnreadBar() {
+  const bar = $("unreadBar");
+  if (!bar) return;
+  if (batchState.running) {
+    bar.innerHTML = `<div class="unread-box"><span class="batch-progress">読み取り中 ${batchState.done}/${batchState.total} …</span><span class="hint">保存済みの原画像を1件ずつ順番に読み取っています。</span></div>`;
+    return;
+  }
+  if (batchState.notice) {
+    const n = batchState.notice;
+    bar.innerHTML = `<div class="unread-box"><span class="continuous-count">まとめて読み取りが終わりました（成功 ${n.succeeded.length} 件${n.failed.length ? `／失敗 ${n.failed.length} 件` : ""}）</span>
+    ${n.succeeded.length ? `<div class="asset-actions">${n.succeeded.map(id => { const a = state.assets.find(x => x.id === id); return `<button class="mini-button" data-review-asset="${id}">結果を確認${a ? "（" + escapeHtml(a.name || a.kind || "資料") + "）" : ""}</button>`; }).join("")}</div>` : ""}
+    ${n.failed.length ? `<span class="hint">読み取れなかった資料：${n.failed.map(f => escapeHtml(f.name || "資料")).join("、")}（原画像は保存済みで、未読み取りのまま残っています。通信状態を確認して再度お試しください）</span>` : ""}
+    <div class="asset-actions"><button class="mini-button" data-dismiss-batch>通知を閉じる</button></div></div>`;
+    return;
+  }
+  const unread = unreadAssetList();
+  bar.innerHTML = unread.length ? `<div class="unread-box"><span class="continuous-count">未読み取り ${unread.length} 件</span><button class="mini-button" data-batch-analyze>未読み取りをまとめて読み取り</button><span class="hint">保存済みの原画像をAIで読み取ります。1件ずつ確認したい場合は、各資料の「AIで読み取り」を押してください。</span></div>` : "";
+}
 function renderAssets() {
   const assets = sortNewest(state.assets, "createdAt").filter(a => !a.propertyId && !a.visitId && !a.areaId);
-  $("assetsList").innerHTML = assets.length ? assets.map(a => `<article class="asset-card"><img data-asset-img="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind || "資料")}</b><span>${escapeHtml(a.name || "")}</span>${a.memo ? `<span>${escapeHtml(a.memo)}</span>` : ""}<small>${escapeHtml((a.createdAt || "").slice(0, 16).replace("T", " "))}</small><div class="asset-actions"><button class="mini-button" data-link-asset="property" data-id="${a.id}">物件に紐付け</button><button class="mini-button" data-link-asset="visit" data-id="${a.id}">訪問記録に紐付け</button><button class="mini-button danger" data-delete-asset="${a.id}">削除</button></div></div></article>`).join("") : emptyState("未整理資料はありません。", "撮影した画像は、行き先が分からなくても保存できます。");
+  $("assetsList").innerHTML = assets.length ? assets.map(a => `<article class="asset-card"><img data-asset-img="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind || "資料")}</b>${hasExtractionFor(a.id) ? "" : '<span class="status-chip">未読み取り</span>'}<span>${escapeHtml(a.name || "")}</span>${a.memo ? `<span>${escapeHtml(a.memo)}</span>` : ""}<small>${escapeHtml((a.createdAt || "").slice(0, 16).replace("T", " "))}</small><div class="asset-actions">${assetAnalyzeButtons(a)}<button class="mini-button" data-link-asset="property" data-id="${a.id}">物件に紐付け</button><button class="mini-button" data-link-asset="visit" data-id="${a.id}">訪問記録に紐付け</button><button class="mini-button danger" data-delete-asset="${a.id}">削除</button></div></div></article>`).join("") : emptyState("未整理資料はありません。", "撮影した画像は、行き先が分からなくても保存できます。");
   for (const a of assets) {
     const img = document.querySelector(`[data-asset-img="${CSS.escape(a.id)}"]`);
     if (img) { const u = assetUrl(a); if (u) img.src = u; }
   }
+  renderUnreadBar();
 }
 
 /* ---------- 評価スナップショット ---------- */
@@ -520,7 +558,7 @@ async function showProperty(id, tab = "summary") {
   } else if (tab === "materials") {
     const assets = sortNewest(state.assets.filter(a => a.propertyId === id), "createdAt");
     body = `<h3>関連資料（${assets.length}件）</h3><div class="detail-tools"><button class="mini-button" data-add-material="${p.id}">追加資料を撮影（AI再読み取り可）</button></div>
-    <div class="asset-grid">${assets.map(a => `<div class="asset-card"><img data-detail-img="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind || "資料")}</b><span>${escapeHtml(a.name || "")}</span>${a.memo ? `<span>${escapeHtml(a.memo)}</span>` : ""}<small>${escapeHtml((a.createdAt || "").slice(0, 16).replace("T", " "))}</small><div class="asset-actions"><button class="mini-button danger" data-delete-asset-detail="${a.id}">削除</button></div></div></div>`).join("") || '<p class="hint">関連資料はまだありません。</p>'}</div>`;
+    <div class="asset-grid">${assets.map(a => `<div class="asset-card"><img data-detail-img="${a.id}" alt=""><div class="asset-meta"><b>${escapeHtml(a.kind || "資料")}</b>${hasExtractionFor(a.id) ? "" : '<span class="status-chip">未読み取り</span>'}<span>${escapeHtml(a.name || "")}</span>${a.memo ? `<span>${escapeHtml(a.memo)}</span>` : ""}<small>${escapeHtml((a.createdAt || "").slice(0, 16).replace("T", " "))}</small><div class="asset-actions">${assetAnalyzeButtons(a)}<button class="mini-button danger" data-delete-asset-detail="${a.id}">削除</button></div></div></div>`).join("") || '<p class="hint">関連資料はまだありません。</p>'}</div>`;
   }
   $("detailContent").innerHTML = `<div class="dialog-head"><div><p class="eyebrow">PROPERTY DETAIL · ${escapeHtml(p.status || "検討中")}</p><h2>${escapeHtml(fv(p, "title") || "名称未設定")}</h2></div><button class="icon-button" data-close>×</button></div>
   <div class="detail-tabs">${tabs.map(([k, l]) => `<button class="detail-tab ${k === tab ? "active" : ""}" data-detail-tab="${k}">${l}</button>`).join("")}</div>
@@ -745,29 +783,46 @@ function compareProperties() {
 }
 
 /* ---------- 資料・AI読み取り ---------- */
+function assetTargetInfoText() {
+  const target = state.assetTargetPropertyId ? state.properties.find(p => p.id === state.assetTargetPropertyId) : null;
+  return target
+    ? `対象物件：${fv(target, "title") || "名称未設定"}。画像はまず原画像として保存されます。AI読み取り結果は、既存の入力内容と並べて確認してから反映します。`
+    : "画像を選ぶと、まず原画像をこのブラウザ内に保存します。AI読み取りは先頭の1枚を使います。読み取り結果を確認してから物件として登録します。";
+}
 function openAssetDialog(targetPropertyId = null) {
   state.assetTargetPropertyId = targetPropertyId;
   $("assetForm").reset();
   $("assetSaveStatus").textContent = "";
-  const target = targetPropertyId ? state.properties.find(p => p.id === targetPropertyId) : null;
-  $("assetTargetInfo").textContent = target
-    ? `対象物件：${fv(target, "title") || "名称未設定"}。画像はまず原画像として保存されます。AI読み取り結果は、既存の入力内容と並べて確認してから反映します。`
-    : "画像を選ぶと、まず原画像をこのブラウザ内に保存します。AI読み取りは先頭の1枚を使います。読み取り結果を確認してから物件として登録します。";
+  state.continuousSavedCount = 0;
+  updateContinuousUi();
   $("assetDialog").showModal();
+}
+function updateContinuousUi() {
+  const on = $("assetContinuous").checked;
+  $("continuousArea").classList.toggle("hidden", !on);
+  $("analyzeFlyerBtn").classList.toggle("hidden", on);
+  $("continuousCount").textContent = `この連続撮影で ${state.continuousSavedCount} 件保存しました`;
+  $("assetTargetInfo").textContent = on
+    ? "連続撮影モード：撮影・選択した画像は、その場で原画像だけを保存します（AI読み取りはしません）。読み取りはあとから「未整理資料」でまとめて実行できます。"
+    : assetTargetInfoText();
 }
 function selectedAssetFiles() {
   return [...($("assetFileCamera").files || []), ...($("assetFilePick").files || [])];
 }
-async function saveSelectedImages() {
-  const files = selectedAssetFiles();
-  if (!files.length) { toast("画像を選択してください。"); return; }
-  $("assetSaveStatus").textContent = "原画像を保存しています…";
+async function saveFilesAsAssets(files) {
   let saved = 0;
   for (const file of files) {
     if (!file.type.startsWith("image/")) continue;
     await saveImageAsset(file, { kind: $("assetKind").value, memo: $("assetMemo").value.trim(), propertyId: state.assetTargetPropertyId || null });
     saved++;
   }
+  return saved;
+}
+async function saveSelectedImages() {
+  const files = selectedAssetFiles();
+  if (!files.length) { toast("画像を選択してください。"); return; }
+  $("assetSaveStatus").textContent = "原画像を保存しています…";
+  const saved = await saveFilesAsAssets(files);
   $("assetSaveStatus").textContent = saved ? `${saved}件の原画像を保存しました。` : "画像ファイルが選択されていません。";
   if (saved) {
     const target = state.assetTargetPropertyId;
@@ -776,6 +831,21 @@ async function saveSelectedImages() {
     await refresh();
     toast(`${saved}件の画像を保存しました。`);
     if (target) await showProperty(target, "materials");
+  }
+}
+async function saveContinuousSelection() {
+  const files = selectedAssetFiles();
+  if (!files.length) return;
+  $("assetSaveStatus").textContent = "原画像を保存しています…";
+  try {
+    const saved = await saveFilesAsAssets(files);
+    state.continuousSavedCount += saved;
+    $("assetFileCamera").value = "";
+    $("assetFilePick").value = "";
+    updateContinuousUi();
+    $("assetSaveStatus").textContent = saved ? `${saved}件を保存しました（連続撮影：合計${state.continuousSavedCount}件）。次のマイソクを撮影できます。` : "画像ファイルが選択されていません。";
+  } catch (err) {
+    $("assetSaveStatus").textContent = "保存できませんでした: " + err.message;
   }
 }
 async function compressImage(file) {
@@ -801,6 +871,77 @@ function blobToBase64(blob) {
     reader.readAsDataURL(blob);
   });
 }
+function buildDiffRows(data, target) {
+  const rows = [];
+  for (const def of FIELD_DEFS) {
+    const aiVal = data[def.key];
+    if (aiVal === null || aiVal === undefined || aiVal === "") continue;
+    const curField = target?.fields?.[def.key] || null;
+    const curVal = target ? fv(target, def.key) : null;
+    const same = JSON.stringify(curVal ?? null) === JSON.stringify(aiVal);
+    let adopt = false;
+    if (!target) adopt = true;
+    else if (curVal === null || curVal === undefined) adopt = true;
+    else if (curField && curField.origin === "ai") adopt = true;
+    else if (same) adopt = true;
+    rows.push({ key: def.key, label: def.label, current: curVal, ai: aiVal, origin: curField?.origin || null, adopt, same });
+  }
+  return rows;
+}
+/* 保存済み asset の Blob を解析し、extraction（と対象物件がある場合は aiAnalysis）を保存する共通コア。
+   新規保存は行わない。失敗時は例外を投げ、原画像には一切触れない。 */
+async function analyzeAssetCore(blob, asset, targetId) {
+  const type = blob.type || asset?.mimeType || "";
+  if (!/^image\/(jpeg|png|webp)$/i.test(type)) throw new Error("JPEG・PNG・WebPの画像のみ読み取れます。");
+  if (blob.size > 20 * 1024 * 1024) throw new Error("画像が20MBを超えています。");
+  const compressed = await compressImage(blob);
+  if (compressed.size > 12 * 1024 * 1024) throw new Error("圧縮後も12MBを超えています。画像を小さくしてください。");
+  const base64 = await blobToBase64(compressed);
+  let propertyContext = null;
+  if (targetId) {
+    const target = await getRecord("properties", targetId);
+    if (target) {
+      const adopted = {};
+      for (const def of FIELD_DEFS) adopted[def.key] = fv(target, def.key);
+      propertyContext = { fields: adopted };
+    }
+  }
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg", propertyContext })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok !== true || !result.data) throw new Error(result.error || "AI読み取りに失敗しました。");
+  const data = result.data;
+  const extraction = {
+    id: uid(), assetId: asset.id, propertyId: targetId || null,
+    model: result.model || "", promptVersion: result.promptVersion || "",
+    rawJson: data, fields: data,
+    uncertainFields: Array.isArray(data.uncertain_fields) ? data.uncertain_fields : [],
+    createdAt: nowIso()
+  };
+  await saveRecord("extractions", extraction);
+  const review = data.review && typeof data.review === "object" ? data.review : null;
+  let analysis = null;
+  if (review && targetId) {
+    analysis = {
+      id: uid(), propertyId: targetId, extractionIds: [extraction.id],
+      publicSummary: review.public_summary || "", highlights: review.highlights || [],
+      risks: review.risks || [], unknowns: review.unknowns || [],
+      confirmationQuestions: review.confirmation_questions || [],
+      rationaleText: review.rationale_text || "", model: result.model || "", createdAt: nowIso()
+    };
+    await saveRecord("aiAnalyses", analysis);
+  }
+  return { extraction, review, analysis, model: result.model || "" };
+}
+async function presentDiff({ assetId, extraction, review, model, targetId }) {
+  const target = targetId ? await getRecord("properties", targetId) : null;
+  const rows = buildDiffRows(extraction.fields || {}, target);
+  state.pendingDiff = { assetId, extraction, review: review || null, analysis: null, model: model || "", targetId: targetId || null, rows };
+  openDiffDialog();
+}
 async function analyzeFlyer(file) {
   if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) { toast("JPEG・PNG・WebPの画像を選択してください。"); return; }
   if (file.size > 20 * 1024 * 1024) { toast("画像が20MBを超えています。"); return; }
@@ -814,6 +955,7 @@ async function analyzeFlyer(file) {
   try {
     asset = await saveImageAsset(file, { kind: $("assetKind").value || "マイソク", memo: $("assetMemo").value.trim(), propertyId: targetId || null });
     status.textContent = "原画像を保存しました。AIで項目を読み取っています…";
+    button.textContent = "AIで読み取っています…";
     const waitStartedAt = Date.now();
     waitTimer = setInterval(() => {
       const sec = Math.floor((Date.now() - waitStartedAt) / 1000);
@@ -823,70 +965,11 @@ async function analyzeFlyer(file) {
         status.textContent = `AIで項目を読み取っています…（${sec}秒経過）混雑時は時間がかかることがあります。`;
       }
     }, 5000);
-    const compressed = await compressImage(file);
-    if (compressed.size > 12 * 1024 * 1024) throw new Error("圧縮後も12MBを超えています。画像を小さくしてください。");
-    const base64 = await blobToBase64(compressed);
-    let propertyContext = null;
-    if (targetId) {
-      const target = await getRecord("properties", targetId);
-      if (target) {
-        const adopted = {};
-        for (const def of FIELD_DEFS) adopted[def.key] = fv(target, def.key);
-        propertyContext = { fields: adopted };
-      }
-    }
-    const response = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg", propertyContext })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.ok !== true || !result.data) throw new Error(result.error || "AI読み取りに失敗しました。");
-    const data = result.data;
-    const extraction = {
-      id: uid(), assetId: asset.id, propertyId: targetId || null,
-      model: result.model || "", promptVersion: result.promptVersion || "",
-      rawJson: data, fields: data,
-      uncertainFields: Array.isArray(data.uncertain_fields) ? data.uncertain_fields : [],
-      createdAt: nowIso()
-    };
-    await saveRecord("extractions", extraction);
-    const review = data.review && typeof data.review === "object" ? data.review : null;
-    let analysis = null;
-    if (review && targetId) {
-      analysis = {
-        id: uid(), propertyId: targetId, extractionIds: [extraction.id],
-        publicSummary: review.public_summary || "", highlights: review.highlights || [],
-        risks: review.risks || [], unknowns: review.unknowns || [],
-        confirmationQuestions: review.confirmation_questions || [],
-        rationaleText: review.rationale_text || "", model: result.model || "", createdAt: nowIso()
-      };
-      await saveRecord("aiAnalyses", analysis);
-    }
-    const target = targetId ? await getRecord("properties", targetId) : null;
-    const rows = [];
-    for (const def of FIELD_DEFS) {
-      const aiVal = data[def.key];
-      if (aiVal === null || aiVal === undefined || aiVal === "") continue;
-      const curField = target?.fields?.[def.key] || null;
-      const curVal = target ? fv(target, def.key) : null;
-      const same = JSON.stringify(curVal ?? null) === JSON.stringify(aiVal);
-      let adopt = false;
-      if (!target) adopt = true;
-      else if (curVal === null || curVal === undefined) adopt = true;
-      else if (curField && curField.origin === "ai") adopt = true;
-      else if (same) adopt = true;
-      rows.push({ key: def.key, label: def.label, current: curVal, ai: aiVal, origin: curField?.origin || null, adopt, same });
-    }
-    state.pendingDiff = { assetId: asset.id, extraction, review, analysis, model: result.model || "", targetId: targetId || null, rows };
+    const { extraction, review, model } = await analyzeAssetCore(file, asset, targetId || null);
     $("assetDialog").close();
     await refresh();
-    openDiffDialog();
+    await presentDiff({ assetId: asset.id, extraction, review, model, targetId: targetId || null });
   } catch (error) {
-    if (asset && targetId && !asset.propertyId) {
-      asset.propertyId = targetId;
-      try { await saveRecord("assets", asset); } catch { /* noop */ }
-    }
     if (asset) await refresh();
     status.textContent = (error.message || "AI読み取りに失敗しました。") + "\n原画像は保存済みです。AI読み取りはオンライン時のみ利用できます。";
     toast("AI読み取りは完了しませんでした。原画像は保存済みです。");
@@ -895,6 +978,63 @@ async function analyzeFlyer(file) {
     button.disabled = false;
     button.textContent = "AIで読み取り";
   }
+}
+/* 保存済み資料をあとから読み取る（単体）。成功したら差分確認ダイアログを開く。 */
+async function analyzeStoredAsset(assetId) {
+  const asset = await getRecord("assets", assetId);
+  if (!asset || !asset.blob) { toast("保存済みの画像が見つかりません。"); return; }
+  if ($("detailDialog").open) $("detailDialog").close();
+  const btn = document.querySelector(`[data-analyze-asset="${CSS.escape(assetId)}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "読み取り中…"; }
+  toast("AIで読み取っています…（混雑時は1〜2分かかることがあります）");
+  try {
+    const { extraction, review, model } = await analyzeAssetCore(asset.blob, asset, asset.propertyId || null);
+    await refresh();
+    await presentDiff({ assetId, extraction, review, model, targetId: extraction.propertyId || asset.propertyId || null });
+  } catch (err) {
+    toast("AI読み取りに失敗しました：" + (err.message || err) + "（原画像は保存済みです）");
+    render();
+  }
+}
+/* 保存済みの読み取り結果から差分確認ダイアログを再構築する（バッチ結果の確認用）。 */
+async function openDiffForExtraction(assetId) {
+  const list = state.extractions.filter(e => e.assetId === assetId);
+  if (!list.length) { toast("読み取り結果がまだありません。先にAI読み取りを実行してください。"); return; }
+  const extraction = sortNewest(list, "createdAt")[0];
+  const asset = state.assets.find(a => a.id === assetId) || await getRecord("assets", assetId);
+  if ($("detailDialog").open) $("detailDialog").close();
+  const data = extraction.fields || {};
+  const review = data.review && typeof data.review === "object" ? data.review : null;
+  await presentDiff({ assetId, extraction, review, model: extraction.model || "", targetId: extraction.propertyId || asset?.propertyId || null });
+}
+/* 未読み取りをまとめて読み取る。途中で差分ダイアログは開かず、結果は通知から個別に確認する。 */
+async function runBatchAnalyze() {
+  if (batchState.running) return;
+  const targets = unreadAssetList();
+  if (!targets.length) { toast("未読み取りの資料はありません。"); return; }
+  batchState.running = true;
+  batchState.total = targets.length;
+  batchState.done = 0;
+  batchState.notice = null;
+  renderUnreadBar();
+  const succeeded = [];
+  const failed = [];
+  for (const item of targets) {
+    try {
+      const asset = await getRecord("assets", item.id);
+      if (!asset || !asset.blob) throw new Error("保存済みの画像が見つかりません。");
+      if (!hasExtractionFor(asset.id)) await analyzeAssetCore(asset.blob, asset, asset.propertyId || null);
+      succeeded.push(asset.id);
+    } catch (err) {
+      failed.push({ id: item.id, name: item.name || item.kind || "資料", error: err.message || String(err) });
+    }
+    batchState.done++;
+    renderUnreadBar();
+  }
+  batchState.running = false;
+  batchState.notice = { succeeded, failed };
+  await refresh();
+  toast(`まとめて読み取りが終わりました（成功 ${succeeded.length} 件${failed.length ? `／失敗 ${failed.length} 件` : ""}）。`);
 }
 function openDiffDialog() {
   const d = state.pendingDiff;
@@ -1218,6 +1358,15 @@ document.addEventListener("click", async (event) => {
       else await analyzeFlyer(file);
       return;
     }
+    if (target.id === "nextShotBtn") { $("assetFileCamera").click(); return; }
+    if (target.id === "continuousEndBtn") { $("assetDialog").close(); return; }
+    if (target.dataset.analyzeAsset) { await analyzeStoredAsset(target.dataset.analyzeAsset); return; }
+    if (target.dataset.reviewAsset) { await openDiffForExtraction(target.dataset.reviewAsset); return; }
+    if (target.hasAttribute("data-batch-analyze")) {
+      runBatchAnalyze().catch(err => { batchState.running = false; renderUnreadBar(); toast("まとめて読み取りに失敗しました: " + (err.message || err)); });
+      return;
+    }
+    if (target.hasAttribute("data-dismiss-batch")) { batchState.notice = null; renderUnreadBar(); return; }
     if (target.dataset.detailProperty) { await showProperty(target.dataset.detailProperty, "summary"); return; }
     if (target.dataset.editProperty) { $("detailDialog").close(); openPropertyForm(state.properties.find(p => p.id === target.dataset.editProperty) || null); return; }
     if (target.dataset.detailTab && state.detailId) { await showProperty(state.detailId, target.dataset.detailTab); return; }
@@ -1292,13 +1441,36 @@ $("agencyForm").addEventListener("submit", saveAgencyForm);
 $("visitForm").addEventListener("submit", saveVisitForm);
 $("settingsForm").addEventListener("submit", saveSettings);
 $("linkForm").addEventListener("submit", saveLink);
-$("assetForm").addEventListener("submit", async (e) => { e.preventDefault(); try { await saveSelectedImages(); } catch (err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; } });
+$("assetForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if ($("assetContinuous").checked) {
+    if (selectedAssetFiles().length) await saveContinuousSelection();
+    else $("assetSaveStatus").textContent = `選択中の画像はありません。撮影済みの画像はすべて保存されています（連続撮影：合計${state.continuousSavedCount}件）。`;
+    return;
+  }
+  try { await saveSelectedImages(); } catch (err) { $("assetSaveStatus").textContent = "保存できませんでした: " + err.message; }
+});
 function updateAssetSelectionStatus() {
   const count = selectedAssetFiles().length;
   $("assetSaveStatus").textContent = count ? `${count}件を選択中。AI読み取りは先頭の1枚を使います。` : "";
 }
-$("assetFileCamera").addEventListener("change", updateAssetSelectionStatus);
-$("assetFilePick").addEventListener("change", updateAssetSelectionStatus);
+async function onAssetFilesChanged() {
+  if ($("assetContinuous").checked) await saveContinuousSelection();
+  else updateAssetSelectionStatus();
+}
+$("assetFileCamera").addEventListener("change", onAssetFilesChanged);
+$("assetFilePick").addEventListener("change", onAssetFilesChanged);
+$("assetContinuous").addEventListener("change", updateContinuousUi);
+$("assetDialog").addEventListener("close", async () => {
+  const count = state.continuousSavedCount;
+  if (!count) return;
+  state.continuousSavedCount = 0;
+  const target = state.assetTargetPropertyId;
+  state.assetTargetPropertyId = null;
+  await refresh();
+  toast(`${count}件の画像を保存しました。読み取りは「未整理資料」から実行できます。`);
+  if (target) await showProperty(target, "materials");
+});
 $("propertySearch").addEventListener("input", render);
 $("importFile").addEventListener("change", async (e) => {
   const file = e.target.files?.[0];

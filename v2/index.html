@@ -39,7 +39,7 @@
       <button class="tab active" data-tab="properties">物件</button>
       <button class="tab" data-tab="areas">地域</button>
       <button class="tab" data-tab="visits">訪問記録</button>
-      <button class="tab" data-tab="assets">未整理資料</button>
+      <button class="tab" data-tab="assets" id="assetsTabBtn">未整理資料</button>
     </nav>
     <section id="propertiesPanel" class="panel">
       <div class="section-heading"><div><p class="eyebrow">PROPERTY ARCHIVE</p><h2>賃貸物件</h2></div><input id="propertySearch" class="search" type="search" placeholder="物件名・所在地・駅で検索"></div>
@@ -60,6 +60,7 @@
     <section id="assetsPanel" class="panel hidden">
       <div class="section-heading"><div><p class="eyebrow">INBOX</p><h2>未整理資料</h2></div></div>
       <p class="hint">撮影した原画像は、このブラウザ内に保存されます。クラウドや端末の写真フォルダへ自動同期はされません。物件や訪問記録へ紐付けると整理できます。</p>
+      <div id="unreadBar"></div>
       <div id="assetsList" class="asset-grid"></div>
     </section>
     <footer>マイソクAI 2.0 — studioCALX / AI × Web × Impact。自分のペースで、住まいと街を記録する。</footer>
@@ -131,6 +132,13 @@
       <p class="hint" id="assetTargetInfo">画像を選ぶと、まず原画像をこのブラウザ内に保存します。AI読み取りは先頭の1枚を使います。</p>
       <label class="upload-zone">カメラで撮影<input id="assetFileCamera" type="file" accept="image/*" capture="environment" multiple></label>
       <label class="upload-zone">写真・ファイルから選ぶ<input id="assetFilePick" type="file" accept="image/*" multiple></label>
+      <label class="check-row"><input type="checkbox" id="assetContinuous">連続撮影：保存だけして、読み取りはあとでまとめて</label>
+      <div id="continuousArea" class="continuous-area hidden">
+        <p class="continuous-count" id="continuousCount">この連続撮影で 0 件保存しました</p>
+        <button id="nextShotBtn" type="button" class="button button-dark full">次のマイソクを撮影</button>
+        <p class="hint">撮影・選択した画像は、その場で原画像だけを保存します（AI読み取りはしません）。読み取りは「未整理資料」からあとで1件ずつ、またはまとめて実行できます。</p>
+        <button id="continuousEndBtn" type="button" class="button button-quiet full">終わる</button>
+      </div>
       <label>資料の種類<select id="assetKind"><option>マイソク</option><option>間取り図</option><option>現地写真</option><option>室内写真</option><option>外観</option><option>周辺写真</option><option>追加資料</option><option>契約資料</option><option>その他</option></select></label>
       <label>ひとことメモ<textarea id="assetMemo" rows="2" placeholder="店名、聞いた話など（任意）"></textarea></label>
       <button id="analyzeFlyerBtn" type="button" class="button button-dark full">AIで読み取り</button>
